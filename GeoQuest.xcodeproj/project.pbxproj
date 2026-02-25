@@ -112,9 +112,6 @@
 			);
 			name = GeoQuest;
 			packageProductDependencies = (
-				A1000002AAAA0002AAAA0001 /* FirebaseAuth */,
-				A1000002AAAA0002AAAA0002 /* FirebaseFirestore */,
-				A1000002AAAA0002AAAA0003 /* FirebaseStorage */,
 			);
 			productName = GeoQuest;
 			productReference = 2930F52D2F4F7CD9003E9338 /* GeoQuest.app */;
@@ -201,7 +198,6 @@
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2930F52E2F4F7CD9003E9338 /* Products */;
 			packageReferences = (
-				A1000001AAAA0001AAAA0001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			projectDirPath = "";
 			projectRoot = "";
@@ -587,34 +583,6 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		A1000001AAAA0001AAAA0001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 11.0.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		A1000002AAAA0002AAAA0001 /* FirebaseAuth */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A1000001AAAA0001AAAA0001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAuth;
-		};
-		A1000002AAAA0002AAAA0002 /* FirebaseFirestore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A1000001AAAA0001AAAA0001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseFirestore;
-		};
-		A1000002AAAA0002AAAA0003 /* FirebaseStorage */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A1000001AAAA0001AAAA0001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseStorage;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 2930F5252F4F7CD9003E9338 /* Project object */;
 }
