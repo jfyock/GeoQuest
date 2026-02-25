@@ -81,11 +81,9 @@ struct ChatView: View {
     }
 
     private func inputBar(viewModel: ChatViewModel) -> some View {
-        HStack(spacing: 12) {
-            TextField("Type a message...", text: Binding(
-                get: { viewModel.messageText },
-                set: { viewModel.messageText = $0 }
-            ), axis: .vertical)
+        @Bindable var vm = viewModel
+        return HStack(spacing: 12) {
+            TextField("Type a message...", text: $vm.messageText, axis: .vertical)
                 .font(GQTheme.bodyFont)
                 .lineLimit(1...4)
                 .padding(12)
