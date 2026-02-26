@@ -15,7 +15,10 @@ struct MapContainerView: View {
         }
         .onAppear {
             if viewModel == nil {
-                viewModel = MapViewModel(questService: appState.questService)
+                viewModel = MapViewModel(
+                    questService: appState.questService,
+                    questGenerationService: appState.questGenerationService
+                )
             }
         }
     }
@@ -100,6 +103,8 @@ struct MapContainerView: View {
         .task {
             if let location = appState.locationService.currentLocation {
                 await viewModel.loadQuestsForRegion(center: location)
+                // Generate quests if the area is sparse (runs once per geohash per session)
+                await viewModel.generateQuestsIfNeeded(near: location)
             }
         }
     }

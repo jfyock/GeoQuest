@@ -34,6 +34,19 @@ enum AppConstants {
     // Friends
     static let maxFriendSearchResults = 20
 
+    // Quest generation
+    enum Generation {
+        /// Max quests (generated + user-created) in a 9-geohash region before
+        /// generation stops. Prevents overloading any single area.
+        static let maxQuestsPerRegion = 15
+        /// How many quests to create in one generation pass.
+        static let batchSizeRange = 3...5
+        /// Radius (meters) to search for nearby points of interest.
+        static let poiSearchRadiusMeters: Double = 800
+        /// Creator ID prefix so generated quests can be identified programmatically.
+        static let creatorIdPrefix = "geoquest_generated_"
+    }
+
     // Firestore collections
     enum Collections {
         static let users = "users"

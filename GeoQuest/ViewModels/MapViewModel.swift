@@ -11,9 +11,11 @@ final class MapViewModel {
 
     private var lastLoadedRegion: MKCoordinateRegion?
     private let questService: QuestService
+    private let questGenerationService: QuestGenerationService
 
-    init(questService: QuestService) {
+    init(questService: QuestService, questGenerationService: QuestGenerationService) {
         self.questService = questService
+        self.questGenerationService = questGenerationService
     }
 
     func loadQuestsForRegion(center: CLLocationCoordinate2D) async {
@@ -66,6 +68,15 @@ final class MapViewModel {
                 isCompleted: true
             )
         }
+    }
+
+    /// Generates quests if the area is sparse, then reloads to display them.
+    /// Called once on initial map load (i.e. on login).
+    func generateQuestsIfNeeded(near coordinate: CLLocationCoordinate2D) async {
+        await questGenerationService.generateQuestsIfNeeded(near: coordinate)
+        // Force reload to pick up any newly generated quests
+        lastLoadedRegion = nil
+        await loadQuestsForRegion(center: coordinate)
     }
 
     func refreshQuests() async {
