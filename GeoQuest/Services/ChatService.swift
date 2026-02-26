@@ -16,7 +16,9 @@ final class ChatService {
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self, let snapshot else { return }
                 self.messages = snapshot.documents.compactMap { doc in
-                    try? doc.data(as: ChatMessage.self)
+                    guard var message = try? doc.data(as: ChatMessage.self) else { return nil }
+                    message.id = doc.documentID
+                    return message
                 }
                 self.isLoading = false
             }

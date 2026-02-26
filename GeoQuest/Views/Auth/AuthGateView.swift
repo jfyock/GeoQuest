@@ -12,6 +12,9 @@ struct AuthGateView: View {
             case .signUp:
                 SignUpView(viewModel: viewModel)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
+            case .usernameSetup:
+                UsernameSetupView(viewModel: viewModel)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
         .animation(GQTheme.smooth, value: viewModel.mode)

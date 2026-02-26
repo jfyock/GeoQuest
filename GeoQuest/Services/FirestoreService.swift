@@ -1,12 +1,31 @@
 import FirebaseFirestore
 
+/// Models that have a mutable `id` field which should be set to the Firestore document ID on decode.
+protocol FirestoreIdentifiable {
+    var id: String { get set }
+}
+
+extension Quest: FirestoreIdentifiable {}
+extension ChatMessage: FirestoreIdentifiable {}
+
 final class FirestoreService {
     let db = Firestore.firestore()
+
+    /// Injects the Firestore document ID into a decoded model's `id` property if it conforms to `FirestoreIdentifiable`.
+    private func injectDocumentId<T>(_ decoded: T, documentId: String) -> T {
+        if var model = decoded as? any FirestoreIdentifiable {
+            model.id = documentId
+            // Safe: concrete type is T, we just round-tripped through the existential
+            return model as! T // swiftlint:disable:this force_cast
+        }
+        return decoded
+    }
 
     func getDocument<T: Decodable>(collection: String, documentId: String) async throws -> T? {
         let snapshot = try await db.collection(collection).document(documentId).getDocument()
         guard snapshot.exists else { return nil }
-        return try snapshot.data(as: T.self)
+        let decoded = try snapshot.data(as: T.self)
+        return injectDocumentId(decoded, documentId: snapshot.documentID)
     }
 
     func setDocument<T: Encodable>(collection: String, documentId: String, data: T) async throws {
@@ -38,7 +57,10 @@ final class FirestoreService {
         if let orderBy { ref = ref.order(by: orderBy, descending: descending) }
         if let limit { ref = ref.limit(to: limit) }
         let snapshot = try await ref.getDocuments()
-        return snapshot.documents.compactMap { try? $0.data(as: T.self) }
+        return snapshot.documents.compactMap { doc in
+            guard let decoded = try? doc.data(as: T.self) else { return nil }
+            return injectDocumentId(decoded, documentId: doc.documentID)
+        }
     }
 
     func queryOrdered<T: Decodable>(
@@ -50,7 +72,10 @@ final class FirestoreService {
         var ref: Query = db.collection(collection).order(by: orderBy, descending: descending)
         if let limit { ref = ref.limit(to: limit) }
         let snapshot = try await ref.getDocuments()
-        return snapshot.documents.compactMap { try? $0.data(as: T.self) }
+        return snapshot.documents.compactMap { doc in
+            guard let decoded = try? doc.data(as: T.self) else { return nil }
+            return injectDocumentId(decoded, documentId: doc.documentID)
+        }
     }
 
     func queryWithPrefix<T: Decodable>(
@@ -63,7 +88,10 @@ final class FirestoreService {
             .whereField(field, isGreaterThanOrEqualTo: prefix)
             .whereField(field, isLessThan: end)
             .getDocuments()
-        return snapshot.documents.compactMap { try? $0.data(as: T.self) }
+        return snapshot.documents.compactMap { doc in
+            guard let decoded = try? doc.data(as: T.self) else { return nil }
+            return injectDocumentId(decoded, documentId: doc.documentID)
+        }
     }
 
     // Subcollection helpers
@@ -79,7 +107,8 @@ final class FirestoreService {
             .document(documentId)
             .getDocument()
         guard snapshot.exists else { return nil }
-        return try snapshot.data(as: T.self)
+        let decoded = try snapshot.data(as: T.self)
+        return injectDocumentId(decoded, documentId: snapshot.documentID)
     }
 
     func setSubDocument<T: Encodable>(
@@ -110,6 +139,9 @@ final class FirestoreService {
         if let orderBy { ref = ref.order(by: orderBy, descending: descending) }
         if let limit { ref = ref.limit(to: limit) }
         let snapshot = try await ref.getDocuments()
-        return snapshot.documents.compactMap { try? $0.data(as: T.self) }
+        return snapshot.documents.compactMap { doc in
+            guard let decoded = try? doc.data(as: T.self) else { return nil }
+            return injectDocumentId(decoded, documentId: doc.documentID)
+        }
     }
 }

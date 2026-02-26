@@ -7,6 +7,7 @@ final class AuthViewModel {
     enum AuthMode {
         case login
         case signUp
+        case usernameSetup
     }
 
     enum AuthState {
@@ -26,6 +27,10 @@ final class AuthViewModel {
     var displayName = ""
     var confirmPassword = ""
 
+    // Apple Sign-In pending credentials (stored while user picks a username)
+    var pendingAppleUid: String?
+    var pendingAppleEmail: String?
+
     var isFormValid: Bool {
         switch mode {
         case .login:
@@ -35,6 +40,8 @@ final class AuthViewModel {
                 && password.isValidPassword
                 && displayName.isValidDisplayName
                 && password == confirmPassword
+        case .usernameSetup:
+            return displayName.isValidDisplayName
         }
     }
 
@@ -82,12 +89,33 @@ final class AuthViewModel {
             // Check if user profile exists
             if let _: GQUser = try await appState.userService.fetchUser(id: uid) {
                 await appState.handleSignIn(uid: uid)
+                state = .idle
             } else {
-                try await appState.handleSignUp(uid: uid, email: email, displayName: displayName)
+                // New user — let them choose a username
+                pendingAppleUid = uid
+                pendingAppleEmail = email
+                self.displayName = displayName
+                state = .idle
+                withAnimation(GQTheme.smooth) {
+                    mode = .usernameSetup
+                }
             }
-            state = .idle
         } catch {
             print("[GeoQuest] Apple sign-in failed: \(error)")
+            state = .error(error.localizedDescription)
+        }
+    }
+
+    func completeUsernameSetup(appState: AppState) async {
+        guard let uid = pendingAppleUid, let email = pendingAppleEmail else { return }
+        state = .loading
+        do {
+            try await appState.handleSignUp(uid: uid, email: email, displayName: displayName.trimmingCharacters(in: .whitespaces))
+            pendingAppleUid = nil
+            pendingAppleEmail = nil
+            state = .idle
+        } catch {
+            print("[GeoQuest] Username setup failed: \(error)")
             state = .error(error.localizedDescription)
         }
     }
@@ -106,6 +134,8 @@ final class AuthViewModel {
         password = ""
         displayName = ""
         confirmPassword = ""
+        pendingAppleUid = nil
+        pendingAppleEmail = nil
         state = .idle
     }
 }

@@ -142,16 +142,26 @@ struct QuestCreationView: View {
                     .foregroundStyle(.secondary)
             }
 
-            ForEach(viewModel.steps.indices, id: \.self) { index in
-                QuestStepEditorView(
-                    stepNumber: index + 1,
-                    instruction: Binding(
-                        get: { viewModel.steps[index].instruction },
-                        set: { viewModel.steps[index].instruction = $0 }
-                    ),
-                    canDelete: viewModel.steps.count > AppConstants.minQuestSteps,
-                    onDelete: { viewModel.removeStep(at: index) }
-                )
+            ForEach(viewModel.steps) { step in
+                if let index = viewModel.steps.firstIndex(where: { $0.id == step.id }) {
+                    QuestStepEditorView(
+                        stepNumber: index + 1,
+                        instruction: Binding(
+                            get: { viewModel.steps.first(where: { $0.id == step.id })?.instruction ?? "" },
+                            set: { newValue in
+                                if let idx = viewModel.steps.firstIndex(where: { $0.id == step.id }) {
+                                    viewModel.steps[idx].instruction = newValue
+                                }
+                            }
+                        ),
+                        canDelete: viewModel.steps.count > AppConstants.minQuestSteps,
+                        onDelete: {
+                            if let idx = viewModel.steps.firstIndex(where: { $0.id == step.id }) {
+                                viewModel.removeStep(at: idx)
+                            }
+                        }
+                    )
+                }
             }
 
             if viewModel.steps.count < AppConstants.maxQuestSteps {

@@ -41,7 +41,9 @@ final class QuestDetailViewModel {
         state = .loading
         do {
             quest = try await questService.fetchQuest(id: id)
-            isCompletedByUser = try await questService.hasUserCompleted(questId: id, userId: userId)
+            if !userId.isEmpty {
+                isCompletedByUser = try await questService.hasUserCompleted(questId: id, userId: userId)
+            }
             state = .loaded
         } catch {
             state = .error(error.localizedDescription)
