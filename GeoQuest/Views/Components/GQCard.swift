@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GQCard<Content: View>: View {
     var padding: CGFloat = GQTheme.paddingMedium
+    var accentColor: Color? = nil
     @ViewBuilder let content: () -> Content
 
     var body: some View {
@@ -10,7 +11,16 @@ struct GQCard<Content: View>: View {
         }
         .padding(padding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(GQTheme.cardBackground, in: RoundedRectangle(cornerRadius: GQTheme.cornerRadius))
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
+                    .fill(GQTheme.cardBackground)
+                if let accentColor {
+                    RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
+                        .stroke(accentColor.opacity(0.2), lineWidth: 2)
+                }
+            }
+        )
         .gqShadow()
     }
 }

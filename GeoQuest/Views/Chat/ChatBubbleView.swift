@@ -9,24 +9,40 @@ struct ChatBubbleView: View {
             if isOwnMessage { Spacer(minLength: 60) }
 
             if !isOwnMessage {
-                AvatarPreviewView(config: message.senderAvatarConfig, size: 32)
+                AvatarPreviewView(config: message.senderAvatarConfig, size: 34)
             }
 
             VStack(alignment: isOwnMessage ? .trailing : .leading, spacing: 4) {
                 if !isOwnMessage {
                     Text(message.senderDisplayName)
-                        .font(GQTheme.caption2Font.weight(.semibold))
+                        .font(.system(.caption2, design: .rounded, weight: .bold))
                         .foregroundStyle(.secondary)
                 }
 
                 Text(message.text)
-                    .font(GQTheme.bodyFont)
+                    .font(.system(.body, design: .rounded, weight: .medium))
                     .foregroundStyle(isOwnMessage ? .white : .primary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 11)
                     .background(
-                        isOwnMessage ? GQTheme.primary : GQTheme.cardBackground,
-                        in: ChatBubbleShape(isOwnMessage: isOwnMessage)
+                        ZStack {
+                            ChatBubbleShape(isOwnMessage: isOwnMessage)
+                                .fill(isOwnMessage ? GQTheme.primary : GQTheme.cardBackground)
+                            if isOwnMessage {
+                                ChatBubbleShape(isOwnMessage: isOwnMessage)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.white.opacity(0.15), .clear],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                    )
+                            }
+                        }
+                    )
+                    .shadow(
+                        color: isOwnMessage ? GQTheme.primary.opacity(0.2) : .black.opacity(0.06),
+                        radius: 4, x: 0, y: 2
                     )
 
                 Text(message.sentAt.chatTimestamp)
@@ -43,13 +59,12 @@ struct ChatBubbleShape: Shape {
     let isOwnMessage: Bool
 
     func path(in rect: CGRect) -> Path {
-        let radius: CGFloat = 16
+        let radius: CGFloat = 18
         let smallRadius: CGFloat = 4
 
         var path = Path()
 
         if isOwnMessage {
-            // Top-left rounded, top-right rounded, bottom-left rounded, bottom-right sharp
             path.addRoundedRect(
                 in: rect,
                 cornerRadii: RectangleCornerRadii(
@@ -60,7 +75,6 @@ struct ChatBubbleShape: Shape {
                 )
             )
         } else {
-            // Top-left sharp, top-right rounded, bottom-left rounded, bottom-right rounded
             path.addRoundedRect(
                 in: rect,
                 cornerRadii: RectangleCornerRadii(

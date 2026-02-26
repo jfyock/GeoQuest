@@ -7,6 +7,8 @@ protocol FirestoreIdentifiable {
 
 extension Quest: FirestoreIdentifiable {}
 extension ChatMessage: FirestoreIdentifiable {}
+extension FriendRequest: FirestoreIdentifiable {}
+extension Friendship: FirestoreIdentifiable {}
 
 final class FirestoreService {
     let db = Firestore.firestore()

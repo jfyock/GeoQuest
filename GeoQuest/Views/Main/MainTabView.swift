@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @State private var selectedTab = 0
+    @State private var tabBounce: Int? = nil
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -26,5 +27,13 @@ struct MainTabView: View {
             }
         }
         .tint(GQTheme.primary)
+        .onChange(of: selectedTab) { _, newTab in
+            withAnimation(GQTheme.bouncyQuick) {
+                tabBounce = newTab
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                tabBounce = nil
+            }
+        }
     }
 }

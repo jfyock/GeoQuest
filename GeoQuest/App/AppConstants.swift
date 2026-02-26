@@ -31,6 +31,9 @@ enum AppConstants {
     // Loading screen
     static let loadingScreenRotationInterval: TimeInterval = 3.0
 
+    // Friends
+    static let maxFriendSearchResults = 20
+
     // Firestore collections
     enum Collections {
         static let users = "users"
@@ -39,5 +42,7 @@ enum AppConstants {
         static let ratings = "ratings"
         static let chatMessages = "chat_messages"
         static let leaderboardGlobal = "leaderboard_global"
+        static let friendRequests = "friend_requests"
+        static let friendships = "friendships"
     }
 }

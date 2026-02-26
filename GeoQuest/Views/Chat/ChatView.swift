@@ -29,19 +29,19 @@ struct ChatView: View {
 
     private func chatContent(viewModel: ChatViewModel) -> some View {
         VStack(spacing: 0) {
-            // Messages
             if viewModel.isLoading && viewModel.messages.isEmpty {
                 Spacer()
                 GQLoadingIndicator(message: "Loading chat...")
                 Spacer()
             } else if viewModel.messages.isEmpty {
                 Spacer()
-                VStack(spacing: 12) {
+                VStack(spacing: 16) {
                     Image(systemName: "bubble.left.and.bubble.right")
-                        .font(.system(size: 48))
-                        .foregroundStyle(.secondary.opacity(0.5))
+                        .font(.system(size: 56, weight: .medium))
+                        .foregroundStyle(GQTheme.primary.opacity(0.3))
+                        .symbolEffect(.bounce, options: .repeating.speed(0.3))
                     Text("No messages yet")
-                        .font(GQTheme.bodyFont)
+                        .font(GQTheme.title3Font)
                         .foregroundStyle(.secondary)
                     Text("Be the first to say hello!")
                         .font(GQTheme.captionFont)
@@ -58,6 +58,7 @@ struct ChatView: View {
                                     isOwnMessage: message.senderId == appState.currentUser?.id
                                 )
                                 .id(message.id)
+                                .transition(.scale.combined(with: .opacity))
                             }
                         }
                         .padding(.horizontal, GQTheme.paddingMedium)
@@ -65,7 +66,7 @@ struct ChatView: View {
                     }
                     .onChange(of: viewModel.messages.count) { _, _ in
                         if let lastId = viewModel.messages.last?.id {
-                            withAnimation(GQTheme.smooth) {
+                            withAnimation(GQTheme.bouncy) {
                                 proxy.scrollTo(lastId, anchor: .bottom)
                             }
                         }
@@ -75,7 +76,6 @@ struct ChatView: View {
 
             Divider()
 
-            // Input bar
             inputBar(viewModel: viewModel)
         }
     }
@@ -84,10 +84,11 @@ struct ChatView: View {
         @Bindable var vm = viewModel
         return HStack(spacing: 12) {
             TextField("Type a message...", text: $vm.messageText, axis: .vertical)
-                .font(GQTheme.bodyFont)
+                .font(.system(.body, design: .rounded, weight: .medium))
                 .lineLimit(1...4)
-                .padding(12)
-                .background(GQTheme.cardBackground, in: RoundedRectangle(cornerRadius: 20))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(GQTheme.cardBackground, in: RoundedRectangle(cornerRadius: GQTheme.cornerRadius))
 
             Button {
                 Task {
@@ -96,14 +97,15 @@ struct ChatView: View {
                 }
             } label: {
                 Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 34))
-                    .foregroundStyle(viewModel.canSend ? GQTheme.primary : .gray.opacity(0.4))
+                    .font(.system(size: 38, weight: .semibold))
+                    .foregroundStyle(viewModel.canSend ? GQTheme.primary : .gray.opacity(0.3))
+                    .shadow(color: viewModel.canSend ? GQTheme.primary.opacity(0.3) : .clear, radius: 6)
             }
             .disabled(!viewModel.canSend)
             .buttonStyle(BouncyButtonStyle())
         }
         .padding(.horizontal, GQTheme.paddingMedium)
-        .padding(.vertical, 10)
+        .padding(.vertical, 12)
         .background(.ultraThinMaterial)
     }
 }

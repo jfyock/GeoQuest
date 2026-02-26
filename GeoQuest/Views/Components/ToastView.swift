@@ -8,15 +8,17 @@ struct ToastView: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
+                .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(color)
             Text(message)
-                .font(GQTheme.captionFont)
+                .font(.system(.subheadline, design: .rounded, weight: .bold))
                 .foregroundStyle(.primary)
         }
-        .padding(.horizontal, GQTheme.paddingMedium)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
         .background(.ultraThinMaterial, in: Capsule())
-        .gqShadow()
+        .overlay(Capsule().stroke(color.opacity(0.2), lineWidth: 1.5))
+        .shadow(color: color.opacity(0.2), radius: 10, y: 4)
     }
 }
 

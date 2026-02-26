@@ -66,12 +66,13 @@ struct LeaderboardView: View {
                 Spacer()
             } else if viewModel.currentEntries.isEmpty {
                 Spacer()
-                VStack(spacing: 12) {
+                VStack(spacing: 14) {
                     Image(systemName: "trophy")
-                        .font(.system(size: 48))
-                        .foregroundStyle(.secondary.opacity(0.5))
+                        .font(.system(size: 52, weight: .medium))
+                        .foregroundStyle(GQTheme.gold.opacity(0.4))
+                        .symbolEffect(.bounce, options: .repeating.speed(0.3))
                     Text("No rankings yet")
-                        .font(GQTheme.bodyFont)
+                        .font(GQTheme.title3Font)
                         .foregroundStyle(.secondary)
                     Text("Complete quests to climb the leaderboard!")
                         .font(GQTheme.captionFont)
@@ -80,7 +81,7 @@ struct LeaderboardView: View {
                 Spacer()
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 4) {
+                    LazyVStack(spacing: 10) {
                         ForEach(Array(viewModel.currentEntries.enumerated()), id: \.element.id) { index, entry in
                             LeaderboardRowView(rank: index + 1, entry: entry)
                         }

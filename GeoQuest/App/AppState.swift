@@ -21,6 +21,7 @@ final class AppState {
     let leaderboardService: LeaderboardService
     let chatService = ChatService()
     let storageService = StorageService()
+    let friendService: FriendService
 
     init() {
         let firestore = FirestoreService()
@@ -28,6 +29,7 @@ final class AppState {
         self.questService = QuestService(firestoreService: firestore)
         self.userService = UserService(firestoreService: firestore)
         self.leaderboardService = LeaderboardService(firestoreService: firestore)
+        self.friendService = FriendService(firestoreService: firestore)
     }
 
     func initialize() async {

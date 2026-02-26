@@ -35,14 +35,15 @@ struct ProfileView: View {
     // MARK: - Header
 
     private func profileHeader(user: GQUser) -> some View {
-        VStack(spacing: 12) {
-            AvatarPreviewView(config: user.avatarConfig, size: 100)
+        VStack(spacing: 14) {
+            AvatarPreviewView(config: user.avatarConfig, size: 110)
+                .shadow(color: GQTheme.secondary.opacity(0.3), radius: 12)
 
             Text(user.displayName)
                 .font(GQTheme.title2Font)
 
             if !user.city.isEmpty {
-                HStack(spacing: 4) {
+                HStack(spacing: 5) {
                     Image(systemName: "mappin.circle.fill")
                         .foregroundStyle(GQTheme.primary)
                     Text(user.city)
@@ -68,24 +69,54 @@ struct ProfileView: View {
     }
 
     private func statCard(value: String, label: String, icon: String, color: Color) -> some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 20))
+                .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(color)
             Text(value)
-                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .font(.system(size: 24, weight: .heavy, design: .rounded))
             Text(label)
-                .font(GQTheme.caption2Font)
+                .font(.system(.caption2, design: .rounded, weight: .bold))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .gqCard()
+        .padding(GQTheme.paddingMedium)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
+                    .fill(GQTheme.cardBackground)
+                RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
+                    .stroke(color.opacity(0.15), lineWidth: 2)
+                RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
+                    .fill(
+                        LinearGradient(
+                            colors: [color.opacity(0.06), .clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            }
+        )
+        .gqShadow()
     }
 
     // MARK: - Nav Links
 
+    @State private var showFriends = false
+
     private var navigationLinks: some View {
         VStack(spacing: 10) {
+            Button {
+                showFriends = true
+            } label: {
+                navRow(icon: "person.2.fill", title: "Friends", color: GQTheme.pink)
+            }
+            .buttonStyle(BouncyScaleStyle())
+            .sheet(isPresented: $showFriends) {
+                FriendsView()
+                    .environment(appState)
+            }
+
             NavigationLink {
                 AvatarCustomizationView()
             } label: {
@@ -103,11 +134,15 @@ struct ProfileView: View {
     }
 
     private func navRow(icon: String, title: String, color: Color) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundStyle(color)
-                .frame(width: 32)
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.15))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(color)
+            }
 
             Text(title)
                 .font(GQTheme.bodyFont)
@@ -116,11 +151,18 @@ struct ProfileView: View {
             Spacer()
 
             Image(systemName: "chevron.right")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(.tertiary)
         }
         .padding(GQTheme.paddingMedium)
-        .background(GQTheme.cardBackground, in: RoundedRectangle(cornerRadius: GQTheme.cornerRadius))
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
+                    .fill(GQTheme.cardBackground)
+                RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
+                    .stroke(color.opacity(0.1), lineWidth: 1.5)
+            }
+        )
     }
 
     // MARK: - Created Quests
