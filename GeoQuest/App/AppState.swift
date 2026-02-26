@@ -1,3 +1,4 @@
+import FirebaseAuth
 import SwiftUI
 
 @Observable
@@ -14,12 +15,20 @@ final class AppState {
     // Services
     let authService = AuthService()
     let locationService = LocationService()
-    let firestoreService = FirestoreService()
-    lazy var questService = QuestService(firestoreService: firestoreService)
-    lazy var userService = UserService(firestoreService: firestoreService)
-    lazy var leaderboardService = LeaderboardService(firestoreService: firestoreService)
+    let firestoreService: FirestoreService
+    let questService: QuestService
+    let userService: UserService
+    let leaderboardService: LeaderboardService
     let chatService = ChatService()
     let storageService = StorageService()
+
+    init() {
+        let firestore = FirestoreService()
+        self.firestoreService = firestore
+        self.questService = QuestService(firestoreService: firestore)
+        self.userService = UserService(firestoreService: firestore)
+        self.leaderboardService = LeaderboardService(firestoreService: firestore)
+    }
 
     func initialize() async {
         authService.startListening()
