@@ -59,7 +59,7 @@ final class AppState {
                 }
             }
         } catch {
-            // If profile load fails, user can still use the app
+            print("[GeoQuest] Failed to load user profile: \(error)")
         }
     }
 
@@ -70,19 +70,14 @@ final class AppState {
         }
     }
 
-    func handleSignUp(uid: String, email: String, displayName: String) async {
+    func handleSignUp(uid: String, email: String, displayName: String) async throws {
         let city = locationService.currentCity
         let newUser = GQUser(id: uid, email: email, displayName: displayName, city: city)
-        do {
-            try await userService.createUser(newUser)
-            // Also create leaderboard entry
-            try await leaderboardService.updateLeaderboardEntry(for: newUser)
-            currentUser = newUser
-            withAnimation(GQTheme.smooth) {
-                authPhase = .authenticated
-            }
-        } catch {
-            // Handle error - user was created in Auth but Firestore failed
+        try await userService.createUser(newUser)
+        try await leaderboardService.updateLeaderboardEntry(for: newUser)
+        currentUser = newUser
+        withAnimation(GQTheme.smooth) {
+            authPhase = .authenticated
         }
     }
 

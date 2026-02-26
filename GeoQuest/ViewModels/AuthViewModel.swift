@@ -52,6 +52,7 @@ final class AuthViewModel {
             }
             state = .idle
         } catch {
+            print("[GeoQuest] Sign-in failed: \(error)")
             state = .error(error.localizedDescription)
         }
     }
@@ -64,9 +65,10 @@ final class AuthViewModel {
                 password: password,
                 displayName: displayName
             )
-            await appState.handleSignUp(uid: uid, email: email, displayName: displayName)
+            try await appState.handleSignUp(uid: uid, email: email, displayName: displayName)
             state = .idle
         } catch {
+            print("[GeoQuest] Sign-up failed: \(error)")
             state = .error(error.localizedDescription)
         }
     }
@@ -81,10 +83,11 @@ final class AuthViewModel {
             if let _: GQUser = try await appState.userService.fetchUser(id: uid) {
                 await appState.handleSignIn(uid: uid)
             } else {
-                await appState.handleSignUp(uid: uid, email: email, displayName: displayName)
+                try await appState.handleSignUp(uid: uid, email: email, displayName: displayName)
             }
             state = .idle
         } catch {
+            print("[GeoQuest] Apple sign-in failed: \(error)")
             state = .error(error.localizedDescription)
         }
     }
