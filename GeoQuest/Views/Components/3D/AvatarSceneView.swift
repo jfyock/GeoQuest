@@ -73,10 +73,15 @@ struct AvatarSceneView: View {
                 print("[AvatarSceneView] ℹ️ no accessory selected")
             }
 
+            if autoRotate { addSpin(to: root) }
+            // Must be in the scene before visualBounds returns non-zero values.
+            content.add(root)
+
             // Auto-fit: normalise scale + centre so the avatar is visible regardless of
             // the GLB's original unit (cm, m, etc.) and the default RealityView camera
             // position.  Target: largest dimension ≈ 0.8 units, centred on origin.
-            let bounds = root.visualBounds(recursive: true, relativeTo: nil, excludeInactive: false)
+            // Use relativeTo: root so bounds are in root's local space.
+            let bounds = root.visualBounds(recursive: true, relativeTo: root, excludeInactive: false)
             let maxExtent = max(bounds.extents.x, bounds.extents.y, bounds.extents.z)
             print("[AvatarSceneView] root bounds — extents=\(bounds.extents) center=\(bounds.center)")
             if maxExtent > 0.0001 {
@@ -84,9 +89,6 @@ struct AvatarSceneView: View {
                 root.scale = SIMD3<Float>(repeating: scale)
                 root.position = -bounds.center * scale
             }
-
-            if autoRotate { addSpin(to: root) }
-            content.add(root)
         }
         // Rebuild only when body colour or accessory changes (eye/mouth/bg are 2D-only)
         .id(config.bodyColor.rawValue + config.accessory.rawValue)
