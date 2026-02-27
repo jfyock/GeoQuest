@@ -16,7 +16,9 @@ struct AvatarPreviewView: View {
     var autoRotate: Bool = false
 
     private var has3DBody: Bool {
-        GLBAssetLoader.shared.isAvailable(named: "avatar_body_default")
+        // Only render a RealityView at sizes where 3D detail is actually visible.
+        // Below 80 pt the model is too small to benefit and each instance adds GPU overhead.
+        size >= 80 && GLBAssetLoader.shared.isAvailable(named: "avatar_body_default")
     }
 
     var body: some View {

@@ -27,12 +27,7 @@ struct QuestAnnotationView: View {
 
                 if let modelName = resolvedModelName() {
                     // 3D quest marker
-                    MapMarker3DView(
-                        modelName: modelName,
-                        tintColor: UIColor(data.iconColor),
-                        cameraY: 1.4,
-                        cameraZ: 2.0
-                    )
+                    MapMarker3DView(modelName: modelName)
                     .frame(width: 38, height: 38)
                     .clipShape(Circle())
                 } else {

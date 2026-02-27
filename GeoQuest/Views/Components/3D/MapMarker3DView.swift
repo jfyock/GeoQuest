@@ -1,61 +1,30 @@
 import SwiftUI
 import RealityKit
 
-/// A lightweight, statically-rendered RealityKit view for map annotation pins.
+/// A lightweight 3D model view for map annotation pins.
 ///
-/// Renders a single GLB model with an optional colour tint applied to all surfaces.
-/// The make closure only runs once per annotation instance (model name and tint are
-/// constant), so rendering cost is comparable to the previous 2D approach.
+/// Uses `Model3D` instead of `RealityView` — `Model3D` shares a single GPU render
+/// context across all instances on screen, so having 10-15 quest pins simultaneously
+/// visible doesn't exhaust Metal allocations the way individual `RealityView` instances
+/// would.  `RealityView` is reserved for the single full-featured avatar on the
+/// customisation screen.
 ///
-/// Camera: uses RealityView's default perspective camera.
-///
-/// Difficulty-to-model mapping used by `QuestAnnotationView`:
-///   .easy   → map_object_tree.glb   (falling back to map_marker_quest.glb)
-///   .medium → map_marker_quest.glb
-///   .hard   → map_object_chest.glb  (falling back to map_marker_quest.glb)
-///   .expert → map_object_flag.glb   (falling back to map_marker_quest.glb)
+/// The GLB model's own baked-in materials are displayed as designed (tree, chest,
+/// flag, etc. each have their natural colours). The difficulty dot and completion
+/// badge continue to be drawn as SwiftUI overlays in `QuestAnnotationView`.
 struct MapMarker3DView: View {
 
     let modelName: String
-    /// Optional tint applied to every surface (e.g. difficulty colour).
-    var tintColor: UIColor? = nil
-    /// Reserved for future camera tuning once the camera Component API stabilises.
-    var cameraY: Float = 1.2
-    var cameraZ: Float = 2.0
 
     var body: some View {
-        RealityView { content in
-            // Lighting
-            let lightEntity = Entity()
-            var light = DirectionalLightComponent()
-            light.intensity = 1200
-            lightEntity.components.set(light)
-            lightEntity.look(at: .zero, from: SIMD3<Float>(1, 3, 2), relativeTo: nil)
-            content.add(lightEntity)
-
-            // Model
-            if let modelEntity = await GLBAssetLoader.shared.entity(named: modelName) {
-                if let color = tintColor {
-                    applyTint(color, to: modelEntity)
-                }
-                content.add(modelEntity)
+        if let url = Bundle.main.url(forResource: modelName, withExtension: "glb") {
+            Model3D(url: url) { model in
+                model
+                    .resizable()
+                    .scaledToFit()
+            } placeholder: {
+                EmptyView()
             }
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func applyTint(_ color: UIColor, to entity: Entity) {
-        if let model = entity as? ModelEntity, var desc = model.model {
-            desc.materials = desc.materials.map { _ in
-                var mat = PhysicallyBasedMaterial()
-                mat.baseColor = .init(tint: color)
-                return mat
-            }
-            model.model = desc
-        }
-        for child in entity.children {
-            applyTint(color, to: child)
         }
     }
 }

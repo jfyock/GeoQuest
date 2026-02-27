@@ -41,11 +41,7 @@ struct AvatarMapAnnotationView: View {
     private var markerContent: some View {
         if hasPlayerMarkerGLB {
             // 3D player pin from GLB
-            MapMarker3DView(
-                modelName: "map_marker_player",
-                cameraY: 1.5,
-                cameraZ: 2.2
-            )
+            MapMarker3DView(modelName: "map_marker_player")
             .frame(width: AppConstants.avatarMapSize, height: AppConstants.avatarMapSize)
             .clipShape(Circle())
         } else if let config {
