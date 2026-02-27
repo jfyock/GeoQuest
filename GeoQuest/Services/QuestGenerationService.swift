@@ -111,14 +111,17 @@ final class QuestGenerationService {
         let empty = StreetInfo(streetName: nil, neighborhood: nil, city: nil, subThoroughfare: nil)
 
         if #available(iOS 26, *) {
-            // MKReverseGeocodingRequest.mapItems is async but not throwing
             guard let request = MKReverseGeocodingRequest(location: location) else { return empty }
-            let mapItems = await request.mapItems
-            guard let item = mapItems.first else { return empty }
-            // MKAddress provides fullAddress/shortAddress but not structured fields.
-            // Use shortAddress as a neighborhood/city approximation.
-            let city = item.address?.shortAddress
-            return StreetInfo(streetName: nil, neighborhood: city, city: city, subThoroughfare: nil)
+            do {
+                let mapItems = try await request.mapItems
+                guard let item = mapItems.first else { return empty }
+                // MKAddress provides fullAddress/shortAddress but not structured fields.
+                // Use shortAddress as a neighborhood/city approximation.
+                let city = item.address?.shortAddress
+                return StreetInfo(streetName: nil, neighborhood: city, city: city, subThoroughfare: nil)
+            } catch {
+                return empty
+            }
         } else {
             do {
                 let geocoder = CLGeocoder()

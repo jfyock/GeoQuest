@@ -38,11 +38,14 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
         let clLocation = CLLocation(latitude: location.latitude, longitude: location.longitude)
 
         if #available(iOS 26, *) {
-            // MKReverseGeocodingRequest.mapItems is async but not throwing
             if let request = MKReverseGeocodingRequest(location: clLocation) {
-                let mapItems = await request.mapItems
-                if let item = mapItems.first, let address = item.address {
-                    currentCity = address.shortAddress ?? ""
+                do {
+                    let mapItems = try await request.mapItems
+                    if let item = mapItems.first, let address = item.address {
+                        currentCity = address.shortAddress ?? ""
+                    }
+                } catch {
+                    // Silently fail - city is optional
                 }
             }
         } else {
