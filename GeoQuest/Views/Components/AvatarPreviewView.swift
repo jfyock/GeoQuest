@@ -18,7 +18,10 @@ struct AvatarPreviewView: View {
     private var has3DBody: Bool {
         // Only render a RealityView at sizes where 3D detail is actually visible.
         // Below 80 pt the model is too small to benefit and each instance adds GPU overhead.
-        size >= 80 && GLBAssetLoader.shared.isAvailable(named: "avatar_body_default")
+        let sizeOk = size >= 80
+        let available = GLBAssetLoader.shared.isAvailable(named: "avatar_body_default")
+        print("[AvatarPreviewView] has3DBody: size=\(size) sizeOk=\(sizeOk) glbAvailable=\(available) → \(sizeOk && available ? "3D" : "2D")")
+        return sizeOk && available
     }
 
     var body: some View {
@@ -31,6 +34,13 @@ struct AvatarPreviewView: View {
                 AvatarSceneView(config: config, autoRotate: autoRotate, cameraZ: 2.5)
                     .frame(width: size * 0.88, height: size * 0.88)
                     .clipShape(Circle())
+                    .overlay(alignment: .bottom) {
+                        // Debug overlay — remove once 3D is confirmed working
+                        Text("3D")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.yellow)
+                            .padding(2)
+                    }
             } else {
                 // 2D fallback — identical to the previous implementation
                 Circle()

@@ -31,6 +31,8 @@ struct AvatarSceneView: View {
 
     var body: some View {
         RealityView { content in
+            print("[AvatarSceneView] RealityView closure started — bodyColor=\(config.bodyColor) accessory=\(config.accessory)")
+
             // Key light (upper-right front)
             let keyLight = Entity()
             var key = DirectionalLightComponent()
@@ -49,16 +51,25 @@ struct AvatarSceneView: View {
 
             // Body
             if let bodyEntity = await GLBAssetLoader.shared.entity(named: "avatar_body_default") {
+                print("[AvatarSceneView] ✅ body entity loaded")
                 applyBodyColor(uiBodyColor(config.bodyColor), to: bodyEntity)
                 if autoRotate { addSpin(to: bodyEntity) }
                 content.add(bodyEntity)
+            } else {
+                print("[AvatarSceneView] ❌ body entity is nil — check GLBAssetLoader logs above")
             }
 
             // Accessory
-            if let accName = accessoryModelName(config.accessory),
-               let accEntity = await GLBAssetLoader.shared.entity(named: accName) {
-                if autoRotate { addSpin(to: accEntity) }
-                content.add(accEntity)
+            if let accName = accessoryModelName(config.accessory) {
+                if let accEntity = await GLBAssetLoader.shared.entity(named: accName) {
+                    print("[AvatarSceneView] ✅ accessory '\(accName)' loaded")
+                    if autoRotate { addSpin(to: accEntity) }
+                    content.add(accEntity)
+                } else {
+                    print("[AvatarSceneView] ❌ accessory '\(accName)' is nil")
+                }
+            } else {
+                print("[AvatarSceneView] ℹ️ no accessory selected")
             }
         }
         // Rebuild only when body colour or accessory changes (eye/mouth/bg are 2D-only)

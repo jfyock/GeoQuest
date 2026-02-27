@@ -13,8 +13,12 @@ struct MapMarker3DView: View {
 
     var body: some View {
         RealityView { content in
+            print("[MapMarker3DView] RealityView closure started — model='\(modelName)'")
             if let entity = await GLBAssetLoader.shared.entity(named: modelName) {
+                print("[MapMarker3DView] ✅ '\(modelName)' entity loaded — adding to scene")
                 content.add(entity)
+            } else {
+                print("[MapMarker3DView] ❌ '\(modelName)' entity is nil — check GLBAssetLoader logs above")
             }
         }
     }

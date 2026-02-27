@@ -27,7 +27,9 @@ final class GLBAssetLoader {
 
     /// Returns true when the GLB file is present in the app bundle.
     func isAvailable(named name: String) -> Bool {
-        Bundle.main.url(forResource: name, withExtension: "glb") != nil
+        let url = Bundle.main.url(forResource: name, withExtension: "glb")
+        print("[GLBAssetLoader] isAvailable('\(name)'): \(url != nil ? "✅ \(url!.path)" : "❌ not found in bundle")")
+        return url != nil
     }
 
     /// Loads the named GLB (or returns a cached clone) as a RealityKit Entity.
@@ -35,18 +37,25 @@ final class GLBAssetLoader {
     func entity(named name: String) async -> Entity? {
         // Fast path: return a clone of the cached master entity
         if let cached = cache[name] {
+            print("[GLBAssetLoader] entity('\(name)'): ✅ returning cached clone")
             return cached.clone(recursive: true)
         }
 
         guard let url = Bundle.main.url(forResource: name, withExtension: "glb") else {
+            print("[GLBAssetLoader] entity('\(name)'): ❌ no bundle URL — file missing from bundle")
             return nil
         }
 
-        guard let loaded = try? await Entity.load(contentsOf: url) else {
+        print("[GLBAssetLoader] entity('\(name)'): loading from \(url.path)")
+
+        do {
+            let loaded = try await Entity.load(contentsOf: url)
+            print("[GLBAssetLoader] entity('\(name)'): ✅ loaded — children: \(loaded.children.count)")
+            cache[name] = loaded
+            return loaded.clone(recursive: true)
+        } catch {
+            print("[GLBAssetLoader] entity('\(name)'): ❌ Entity.load failed — \(error)")
             return nil
         }
-
-        cache[name] = loaded
-        return loaded.clone(recursive: true)
     }
 }
