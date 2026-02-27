@@ -72,23 +72,35 @@ final class GLBAssetLoader {
         let root = Entity()
         var meshCount = 0
 
-        func process(_ object: MDLObject, parent: Entity) {
-            if let mdlMesh = object as? MDLMesh,
-               let modelEntity = makeModelEntity(from: mdlMesh) {
-                modelEntity.name = object.name
-                parent.addChild(modelEntity)
+        print("[GLBAssetLoader] buildEntity('\(label)'): asset.count=\(asset.count)")
+
+        // Primary: MDLAsset.childObjects(of:) recursively searches the entire
+        // asset hierarchy — more reliable than walking children.objects manually.
+        let allMeshes = asset.childObjects(of: MDLMesh.self)
+        print("[GLBAssetLoader] buildEntity('\(label)'): childObjects(MDLMesh)=\(allMeshes.count)")
+
+        for case let mdlMesh as MDLMesh in allMeshes {
+            print("[GLBAssetLoader]   mesh '\(mdlMesh.name)' vertices=\(mdlMesh.vertexCount) submeshes=\(mdlMesh.submeshes?.count ?? 0)")
+            if let modelEntity = makeModelEntity(from: mdlMesh) {
+                root.addChild(modelEntity)
                 meshCount += 1
-                for child in object.children.objects { process(child, parent: modelEntity) }
-                return
             }
-            let node = Entity()
-            node.name = object.name
-            parent.addChild(node)
-            for child in object.children.objects { process(child, parent: node) }
         }
 
-        for i in 0..<asset.count {
-            process(asset.object(at: i), parent: root)
+        // Fallback: manual recursive traversal via children.objects
+        if meshCount == 0 {
+            print("[GLBAssetLoader] buildEntity('\(label)'): childObjects found nothing — trying recursive traversal")
+            func process(_ object: MDLObject, depth: Int = 0) {
+                let indent = String(repeating: "  ", count: depth)
+                print("[GLBAssetLoader]   \(indent)\(type(of: object)) '\(object.name)' children=\(object.children.count)")
+                if let mdlMesh = object as? MDLMesh,
+                   let modelEntity = makeModelEntity(from: mdlMesh) {
+                    root.addChild(modelEntity)
+                    meshCount += 1
+                }
+                for child in object.children.objects { process(child, depth: depth + 1) }
+            }
+            for i in 0..<asset.count { process(asset.object(at: i)) }
         }
 
         print("[GLBAssetLoader] buildEntity('\(label)'): \(meshCount) mesh(es) built")
