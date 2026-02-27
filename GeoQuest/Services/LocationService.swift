@@ -38,7 +38,7 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
         let clLocation = CLLocation(latitude: location.latitude, longitude: location.longitude)
         do {
             if #available(iOS 26, *) {
-                guard let request = MKReverseGeocodingRequest(location: clLocation) else { return }
+                let request = MKReverseGeocodingRequest(location: clLocation)
                 let mapItems = try await request.mapItems
                 if let item = mapItems.first, let address = item.address {
                     currentCity = address.shortAddress ?? ""

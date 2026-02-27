@@ -112,7 +112,7 @@ final class QuestGenerationService {
 
         do {
             if #available(iOS 26, *) {
-                guard let request = MKReverseGeocodingRequest(location: location) else { return empty }
+                let request = MKReverseGeocodingRequest(location: location)
                 let mapItems = try await request.mapItems
                 guard let item = mapItems.first else { return empty }
                 // MKAddress provides fullAddress/shortAddress but not structured fields.
@@ -141,7 +141,7 @@ final class QuestGenerationService {
 
     private func coordinate(of item: MKMapItem) -> CLLocationCoordinate2D {
         if #available(iOS 26, *) {
-            return item.location?.coordinate ?? CLLocationCoordinate2D()
+            return item.location.coordinate
         }
         return item.placemark.coordinate
     }
