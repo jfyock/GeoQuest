@@ -36,9 +36,18 @@ final class GLBAssetLoader: @unchecked Sendable {
             return nil
         }
 
-        let asset = MDLAsset(url: url)
-        asset.loadTextures()
-        let scene = SCNScene(mdlAsset: asset)
+        // SCNScene(mdlAsset:) was removed in iOS 26; assemble the scene manually
+        // using SCNNode(mdlObject:) which recursively converts the MDL hierarchy
+        // (meshes, materials, and embedded textures included).
+        let mdlAsset = MDLAsset(url: url)
+        mdlAsset.loadTextures()
+
+        let scene = SCNScene()
+        for index in 0..<mdlAsset.count {
+            let scnNode = SCNNode(mdlObject: mdlAsset.object(at: index))
+            scene.rootNode.addChildNode(scnNode)
+        }
+
         cache[name] = scene
         return scene
     }
