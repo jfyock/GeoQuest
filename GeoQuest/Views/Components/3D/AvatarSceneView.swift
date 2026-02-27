@@ -1,123 +1,136 @@
 import SwiftUI
-import RealityKit
+import SceneKit
+import ModelIO
 
-/// A RealityKit-backed view that renders the player's 3D avatar using GLB assets.
+/// A SceneKit-backed view that renders the player's 3D avatar from GLB assets.
 ///
 /// Composition:
-///   1. Loads `avatar_body_default.glb` via `GLBAssetLoader`.
-///   2. Tints every ModelEntity surface with the chosen body colour using
-///      `PhysicallyBasedMaterial`.
-///   3. Overlays the selected `avatar_acc_*.glb` accessory entity.
-///   4. Two `DirectionalLightComponent` entities (key + fill) for pleasant shading.
+///   1. Loads `avatar_body_default.glb` via `GLBSceneLoader` (MDLAsset → SCNScene).
+///   2. Tints every geometry's diffuse with the chosen body colour.
+///   3. Overlays the selected `avatar_acc_*.glb` accessory node.
+///   4. Auto-fits scale + position so the avatar is always framed by the fixed camera.
 ///
-/// Camera: uses RealityView's default perspective camera.  Position/scale of the
-/// loaded GLB determines framing — adjust in your modelling tool or set
-/// entity.position after load if the model needs repositioning.
-///
-/// Uses `.id(bodyColor + accessory)` so the RealityView only rebuilds when a
-/// 3D-relevant config property changes; entities are served from `GLBAssetLoader`'s
-/// in-memory cache so rebuilds are nearly instant.
-///
-/// Renders nothing when GLB assets are absent — `AvatarPreviewView` shows the
-/// 2D fallback in that case.
+/// Why SceneKit instead of RealityKit:
+///   ModelIO's MDLAsset.export(to: .usdc) strips mesh geometry — the resulting
+///   Entity.load produces nodes with zero visual bounds.  SCNScene(mdlAsset:) is
+///   the ModelIO-native conversion path and correctly preserves GLB geometry.
 struct AvatarSceneView: View {
 
     let config: AvatarConfig
-    /// Continuously spins the avatar — enable on the customisation screen.
     var autoRotate: Bool = false
-    /// Reserved for future camera-distance tuning; not yet wired to an iOS 26
-    /// camera component (PerspectiveCamera lost its Component conformance in iOS 26).
     var cameraZ: Float = 2.5
 
     var body: some View {
-        RealityView { content in
-            print("[AvatarSceneView] RealityView closure started — bodyColor=\(config.bodyColor) accessory=\(config.accessory)")
+        _AvatarSCNView(config: config, autoRotate: autoRotate, cameraZ: cameraZ)
+            .id(config.bodyColor.rawValue + config.accessory.rawValue)
+    }
+}
 
-            // Key light (upper-right front)
-            let keyLight = Entity()
-            var key = DirectionalLightComponent()
-            key.intensity = 1200
-            keyLight.components.set(key)
-            keyLight.look(at: .zero, from: SIMD3<Float>(2, 4, 3), relativeTo: nil)
-            content.add(keyLight)
+// MARK: - UIViewRepresentable
 
-            // Fill light (upper-left back)
-            let fillLight = Entity()
-            var fill = DirectionalLightComponent()
-            fill.intensity = 400
-            fillLight.components.set(fill)
-            fillLight.look(at: .zero, from: SIMD3<Float>(-3, 1, 2), relativeTo: nil)
-            content.add(fillLight)
+private struct _AvatarSCNView: UIViewRepresentable {
 
-            // Root container: body + accessory are children so they scale as one unit.
-            let root = Entity()
+    let config: AvatarConfig
+    let autoRotate: Bool
+    let cameraZ: Float
 
-            // Body
-            if let bodyEntity = await GLBAssetLoader.shared.entity(named: "avatar_body_default") {
-                print("[AvatarSceneView] ✅ body entity loaded")
-                applyBodyColor(uiBodyColor(config.bodyColor), to: bodyEntity)
-                root.addChild(bodyEntity)
+    func makeUIView(context: Context) -> SCNView {
+        let scnView = SCNView()
+        scnView.backgroundColor = .clear
+        scnView.isOpaque = false
+        scnView.autoenablesDefaultLighting = true
+        scnView.allowsCameraControl = false
+        scnView.antialiasingMode = .multisampling4X
+
+        let scene = SCNScene()
+        scene.background.contents = UIColor.clear
+
+        // Fixed perspective camera — cameraZ from caller (default 2.5)
+        let camNode = SCNNode()
+        camNode.name = "avatarCamera"
+        camNode.camera = SCNCamera()
+        camNode.position = SCNVector3(0, 0, cameraZ)
+        scene.rootNode.addChildNode(camNode)
+
+        scnView.scene = scene
+        scnView.pointOfView = camNode
+        return scnView
+    }
+
+    func updateUIView(_ scnView: SCNView, context: Context) {
+        Task { @MainActor in
+            await refreshAvatar(in: scnView)
+        }
+    }
+
+    // MARK: - Avatar Loading
+
+    @MainActor
+    private func refreshAvatar(in scnView: SCNView) async {
+        guard let scene = scnView.scene else { return }
+
+        // Remove previous avatar (keep camera and lights)
+        scene.rootNode.childNodes(passingTest: { n, _ in n.name == "avatarRoot" })
+            .forEach { $0.removeFromParentNode() }
+
+        let avatarRoot = SCNNode()
+        avatarRoot.name = "avatarRoot"
+
+        // Body
+        if let bodyNode = await GLBSceneLoader.shared.node(named: "avatar_body_default") {
+            print("[AvatarSceneView] ✅ body node loaded")
+            applyBodyColor(uiBodyColor(config.bodyColor), to: bodyNode)
+            avatarRoot.addChildNode(bodyNode)
+        } else {
+            print("[AvatarSceneView] ❌ body node is nil")
+        }
+
+        // Accessory
+        if let accName = accessoryModelName(config.accessory) {
+            if let accNode = await GLBSceneLoader.shared.node(named: accName) {
+                print("[AvatarSceneView] ✅ accessory '\(accName)' loaded")
+                avatarRoot.addChildNode(accNode)
             } else {
-                print("[AvatarSceneView] ❌ body entity is nil — check GLBAssetLoader logs above")
-            }
-
-            // Accessory
-            if let accName = accessoryModelName(config.accessory) {
-                if let accEntity = await GLBAssetLoader.shared.entity(named: accName) {
-                    print("[AvatarSceneView] ✅ accessory '\(accName)' loaded")
-                    root.addChild(accEntity)
-                } else {
-                    print("[AvatarSceneView] ❌ accessory '\(accName)' is nil")
-                }
-            } else {
-                print("[AvatarSceneView] ℹ️ no accessory selected")
-            }
-
-            if autoRotate { addSpin(to: root) }
-            // Must be in the scene before visualBounds returns non-zero values.
-            content.add(root)
-
-            // Auto-fit: normalise scale + centre so the avatar is visible regardless of
-            // the GLB's original unit (cm, m, etc.) and the default RealityView camera
-            // position.  Target: largest dimension ≈ 0.8 units, centred on origin.
-            // Use relativeTo: root so bounds are in root's local space.
-            let bounds = root.visualBounds(recursive: true, relativeTo: root, excludeInactive: false)
-            let maxExtent = max(bounds.extents.x, bounds.extents.y, bounds.extents.z)
-            print("[AvatarSceneView] root bounds — extents=\(bounds.extents) center=\(bounds.center)")
-            if maxExtent > 0.0001 {
-                let scale = Float(0.8) / maxExtent
-                root.scale = SIMD3<Float>(repeating: scale)
-                root.position = -bounds.center * scale
+                print("[AvatarSceneView] ❌ accessory '\(accName)' is nil")
             }
         }
-        // Rebuild only when body colour or accessory changes (eye/mouth/bg are 2D-only)
-        .id(config.bodyColor.rawValue + config.accessory.rawValue)
+
+        // Auto-fit: SCNNode.boundingBox includes all child geometry and works on
+        // detached nodes, so we can scale before adding to the scene.
+        let (minBB, maxBB) = avatarRoot.boundingBox
+        let sizeX = maxBB.x - minBB.x
+        let sizeY = maxBB.y - minBB.y
+        let sizeZ = maxBB.z - minBB.z
+        let maxDim = max(sizeX, max(sizeY, sizeZ))
+        print("[AvatarSceneView] avatarRoot boundingBox — min=\(minBB) max=\(maxBB)")
+        if maxDim > 0.0001 {
+            // Target 1.5 units: fills ~52% of the 60° FOV at cameraZ=2.5
+            let s = Float(1.5) / maxDim
+            avatarRoot.scale = SCNVector3(s, s, s)
+            let cx = (minBB.x + maxBB.x) / 2
+            let cy = (minBB.y + maxBB.y) / 2
+            let cz = (minBB.z + maxBB.z) / 2
+            avatarRoot.position = SCNVector3(-cx * s, -cy * s, -cz * s)
+        }
+
+        if autoRotate {
+            avatarRoot.runAction(
+                .repeatForever(.rotateBy(x: 0, y: .pi * 2, z: 0, duration: 8))
+            )
+        }
+
+        scene.rootNode.addChildNode(avatarRoot)
     }
 
     // MARK: - Helpers
 
-    private func addSpin(to entity: Entity) {
-        let spin = FromToByAnimation<Transform>(
-            by: Transform(rotation: simd_quatf(angle: .pi * 2, axis: [0, 1, 0])),
-            duration: 8,
-            timing: .linear,
-            isAdditive: true
-        )
-        if let resource = try? AnimationResource.generate(with: spin) {
-            entity.playAnimation(resource.repeat())
-        }
-    }
-
-    private func applyBodyColor(_ color: UIColor, to entity: Entity) {
-        if let model = entity as? ModelEntity, var desc = model.model {
-            desc.materials = desc.materials.map { _ in
-                var mat = PhysicallyBasedMaterial()
-                mat.baseColor = .init(tint: color)
-                return mat
+    private func applyBodyColor(_ color: UIColor, to node: SCNNode) {
+        if let geometry = node.geometry {
+            for material in geometry.materials {
+                material.diffuse.contents = color
             }
-            model.model = desc
         }
-        for child in entity.children {
+        for child in node.childNodes {
             applyBodyColor(color, to: child)
         }
     }
