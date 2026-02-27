@@ -18,7 +18,7 @@ enum AppConstants {
     static let chatMessageFetchLimit = 100
 
     // Leaderboard
-    static let leaderboardTopCount = 10
+    nonisolated(unsafe) static let leaderboardTopCount = 10
 
     // Map
     static let defaultMapSpanDelta = 0.05

@@ -52,7 +52,7 @@ final class QuestGenerationService {
 
                 // Place quest near the first POI so players start nearby
                 let questCoord = randomOffset(
-                    from: questPlaces[0].placemark.coordinate,
+                    from: coordinate(of: questPlaces[0]),
                     metersRange: 30...120
                 )
 
@@ -107,23 +107,59 @@ final class QuestGenerationService {
     }
 
     private func reverseGeocode(coordinate: CLLocationCoordinate2D) async -> StreetInfo {
-        let geocoder = CLGeocoder()
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        let empty = StreetInfo(streetName: nil, neighborhood: nil, city: nil, subThoroughfare: nil)
 
         do {
-            let placemarks = try await geocoder.reverseGeocodeLocation(location)
-            guard let pm = placemarks.first else {
-                return StreetInfo(streetName: nil, neighborhood: nil, city: nil, subThoroughfare: nil)
+            if #available(iOS 26, *) {
+                guard let request = MKReverseGeocodingRequest(location: location) else { return empty }
+                let mapItems = try await request.mapItems
+                guard let item = mapItems.first else { return empty }
+                // MKAddress provides fullAddress/shortAddress but not structured fields.
+                // Use shortAddress as a neighborhood/city approximation.
+                let city = item.address?.shortAddress
+                return StreetInfo(streetName: nil, neighborhood: city, city: city, subThoroughfare: nil)
+            } else {
+                let geocoder = CLGeocoder()
+                let placemarks = try await geocoder.reverseGeocodeLocation(location)
+                guard let pm = placemarks.first else { return empty }
+                return StreetInfo(
+                    streetName: pm.thoroughfare,
+                    neighborhood: pm.subLocality ?? pm.locality,
+                    city: pm.locality,
+                    subThoroughfare: pm.subThoroughfare
+                )
             }
-            return StreetInfo(
-                streetName: pm.thoroughfare,
-                neighborhood: pm.subLocality ?? pm.locality,
-                city: pm.locality,
-                subThoroughfare: pm.subThoroughfare
-            )
         } catch {
-            return StreetInfo(streetName: nil, neighborhood: nil, city: nil, subThoroughfare: nil)
+            return empty
         }
+    }
+
+    // MARK: - MKMapItem Compatibility
+    // MKMapItem.placemark is deprecated in iOS 26. These helpers use the new
+    // API when available and fall back to placemark on older versions.
+
+    private func coordinate(of item: MKMapItem) -> CLLocationCoordinate2D {
+        if #available(iOS 26, *) {
+            return item.location?.coordinate ?? CLLocationCoordinate2D()
+        }
+        return item.placemark.coordinate
+    }
+
+    private func streetName(of item: MKMapItem, fallback: String?) -> String {
+        if #available(iOS 26, *) {
+            // MKAddress does not expose thoroughfare. Use reverse-geocoded fallback.
+            return fallback ?? "the street"
+        }
+        return item.placemark.thoroughfare ?? fallback ?? "the street"
+    }
+
+    private func addressNumber(of item: MKMapItem) -> String? {
+        if #available(iOS 26, *) {
+            // MKAddress does not expose subThoroughfare. Other code strategies are used.
+            return nil
+        }
+        return item.placemark.subThoroughfare
     }
 
     // MARK: - Quest Building
@@ -135,9 +171,7 @@ final class QuestGenerationService {
     ) -> Quest {
         let primaryPlace = places[0]
         let primaryName = primaryPlace.name ?? "the landmark"
-        let streetName = primaryPlace.placemark.thoroughfare
-            ?? streetInfo.streetName
-            ?? "the main road"
+        let streetName = streetName(of: primaryPlace, fallback: streetInfo.streetName)
         let area = streetInfo.neighborhood ?? streetInfo.city ?? "the area"
 
         let title = fillTemplate(
@@ -188,7 +222,7 @@ final class QuestGenerationService {
         // First step — orient the player
         if let first = places.first {
             let name = first.name ?? "the landmark"
-            let street = first.placemark.thoroughfare ?? streetInfo.streetName ?? "the road"
+            let street = streetName(of: first, fallback: streetInfo.streetName)
             let instruction = fillTemplate(
                 QuestGenerationData.firstStepTemplates.randomElement()!,
                 place: name, street: street, area: area
@@ -202,7 +236,7 @@ final class QuestGenerationService {
             for i in 1..<(places.count - 1) {
                 let place = places[i]
                 let name = place.name ?? "the next spot"
-                let street = place.placemark.thoroughfare ?? streetInfo.streetName ?? "the street"
+                let street = streetName(of: place, fallback: streetInfo.streetName)
                 let direction = QuestGenerationData.directions.randomElement()!
                 let side = QuestGenerationData.sides.randomElement()!
 
@@ -218,7 +252,7 @@ final class QuestGenerationService {
 
         // Optional observation step for 2-place quests to add depth
         if places.count == 2, Bool.random() {
-            let street = streetInfo.streetName ?? places[0].placemark.thoroughfare ?? "the street"
+            let street = streetInfo.streetName ?? streetName(of: places[0], fallback: nil)
             let instruction = fillTemplate(
                 QuestGenerationData.observationStepTemplates.randomElement()!,
                 place: "", street: street, area: area
@@ -230,11 +264,11 @@ final class QuestGenerationService {
         // Final step — find the code
         if let last = places.last, places.count > 1 {
             let name = last.name ?? "your destination"
-            let street = last.placemark.thoroughfare ?? streetInfo.streetName ?? "the street"
-            let addressNumber = last.placemark.subThoroughfare
+            let street = streetName(of: last, fallback: streetInfo.streetName)
+            let addrNum = addressNumber(of: last)
 
             let instruction: String
-            if addressNumber != nil {
+            if addrNum != nil {
                 // Code is the address number — use address-based template
                 instruction = fillTemplate(
                     QuestGenerationData.finalStepTemplates.randomElement()!,
@@ -263,7 +297,7 @@ final class QuestGenerationService {
     private func generateSecretCode(from places: [MKMapItem]) -> String {
         // Strategy 1: Use address number from the final place
         if let last = places.last,
-           let address = last.placemark.subThoroughfare,
+           let address = addressNumber(of: last),
            address.count >= AppConstants.minSecretCodeLength {
             return String(address.prefix(AppConstants.maxSecretCodeLength))
         }

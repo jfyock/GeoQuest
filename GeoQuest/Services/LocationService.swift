@@ -1,9 +1,9 @@
 import CoreLocation
+import MapKit
 
 @Observable
-final class LocationService: NSObject, @preconcurrency CLLocationManagerDelegate {
+final class LocationService: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
-    private let geocoder = CLGeocoder()
 
     private(set) var currentLocation: CLLocationCoordinate2D?
     private(set) var currentCity: String = ""
@@ -37,9 +37,18 @@ final class LocationService: NSObject, @preconcurrency CLLocationManagerDelegate
         guard let location = currentLocation else { return }
         let clLocation = CLLocation(latitude: location.latitude, longitude: location.longitude)
         do {
-            let placemarks = try await geocoder.reverseGeocodeLocation(clLocation)
-            if let city = placemarks.first?.locality {
-                currentCity = city
+            if #available(iOS 26, *) {
+                guard let request = MKReverseGeocodingRequest(location: clLocation) else { return }
+                let mapItems = try await request.mapItems
+                if let item = mapItems.first, let address = item.address {
+                    currentCity = address.shortAddress ?? ""
+                }
+            } else {
+                let geocoder = CLGeocoder()
+                let placemarks = try await geocoder.reverseGeocodeLocation(clLocation)
+                if let city = placemarks.first?.locality {
+                    currentCity = city
+                }
             }
         } catch {
             // Silently fail - city is optional

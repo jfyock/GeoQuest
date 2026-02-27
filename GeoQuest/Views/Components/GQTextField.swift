@@ -31,7 +31,7 @@ struct GQTextField: View {
             if let maxLength {
                 Text("\(text.count)/\(maxLength)")
                     .font(.system(.caption2, design: .rounded, weight: .bold))
-                    .foregroundStyle(text.count >= maxLength ? GQTheme.error : .tertiary)
+                    .foregroundStyle(text.count >= maxLength ? GQTheme.error : Color(.tertiaryLabel))
             }
         }
         .padding(.horizontal, GQTheme.paddingMedium + 2)
