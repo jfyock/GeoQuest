@@ -63,12 +63,13 @@ final class GLBAssetLoader {
         let exported = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 let asset = MDLAsset(url: glbURL)
-                asset.export(to: tempURL)
-                let ok = FileManager.default.fileExists(atPath: tempURL.path)
-                if !ok {
-                    print("[GLBAssetLoader] entity('\(name)'): ❌ MDLAsset.export failed — no output file created")
+                do {
+                    try asset.export(to: tempURL)
+                    cont.resume(returning: true)
+                } catch {
+                    print("[GLBAssetLoader] entity('\(name)'): ❌ MDLAsset.export threw — \(error)")
+                    cont.resume(returning: false)
                 }
-                cont.resume(returning: ok)
             }
         }
 
