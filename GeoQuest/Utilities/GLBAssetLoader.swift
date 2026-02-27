@@ -39,16 +39,19 @@ final class GLBAssetLoader {
             return nil
         }
 
-        // Strategy 1: direct load (works if the OS has a native GLB importer)
-        if let entity = try? await Entity.load(contentsOf: glbURL) {
+        // Strategy 1: direct RealityKit load
+        print("[GLBAssetLoader] entity('\(name)'): trying Entity.load(contentsOf:)")
+        do {
+            let entity = try await Entity.load(contentsOf: glbURL)
             print("[GLBAssetLoader] entity('\(name)'): ✅ direct GLB load — children: \(entity.children.count)")
             cache[name] = entity
             return entity.clone(recursive: true)
+        } catch {
+            print("[GLBAssetLoader] entity('\(name)'): ❌ Entity.load failed: \(error)")
         }
 
         // Strategy 2: MDLAsset → MeshDescriptor → ModelEntity
-        // Avoids file export which loses all mesh geometry.
-        print("[GLBAssetLoader] entity('\(name)'): building from MDLAsset vertex buffers")
+        print("[GLBAssetLoader] entity('\(name)'): trying MDLAsset (canImport glb=\(MDLAsset.canImportFileExtension("glb")))")
         let built = await withCheckedContinuation { (cont: CheckedContinuation<Entity?, Never>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 cont.resume(returning: Self.buildEntity(from: glbURL, label: name))
