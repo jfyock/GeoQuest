@@ -2,17 +2,13 @@ import SwiftUI
 
 /// A map annotation pin for a single quest.
 ///
-/// **3D mode** — active when the appropriate GLB for the quest's difficulty is in the bundle.
-/// Falls back through the model priority chain before defaulting to the 2D implementation:
+/// Renders purely in 2D — a coloured circle with a difficulty icon overlay.
+/// The difficulty-colour dot and completion badge are SwiftUI overlays.
 ///
-///   Difficulty → preferred model      → fallback model
-///   .easy      → map_object_tree.glb  → map_marker_quest.glb → 2D icon
-///   .medium    → map_marker_quest.glb → 2D icon
-///   .hard      → map_object_chest.glb → map_marker_quest.glb → 2D icon
-///   .expert    → map_object_flag.glb  → map_marker_quest.glb → 2D icon
-///
-/// The difficulty-colour dot and completion badge are always rendered as SwiftUI overlays
-/// on top of either the 3D scene or the 2D fallback.
+/// Note: 3D GLB quest markers are intentionally omitted. Each `RealityView`
+/// instance creates its own Metal render context; with 10-15 simultaneous pins
+/// this exhausts GPU memory (`CAMetalLayer nextDrawable` returning nil).
+/// `Model3D`, which shares a context, is visionOS-only and unavailable on iOS.
 struct QuestAnnotationView: View {
     let data: QuestAnnotationData
     @State private var isAppearing = false
@@ -25,21 +21,13 @@ struct QuestAnnotationView: View {
                     .fill(data.iconColor.opacity(0.2))
                     .frame(width: 48, height: 48)
 
-                if let modelName = resolvedModelName() {
-                    // 3D quest marker
-                    MapMarker3DView(modelName: modelName)
+                Circle()
+                    .fill(data.iconColor)
                     .frame(width: 38, height: 38)
-                    .clipShape(Circle())
-                } else {
-                    // 2D fallback — original design
-                    Circle()
-                        .fill(data.iconColor)
-                        .frame(width: 38, height: 38)
 
-                    Image(systemName: data.iconName)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
+                Image(systemName: data.iconName)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
 
                 // Completion badge (always SwiftUI overlay)
                 if data.isCompletedByCurrentUser {
@@ -78,35 +66,6 @@ struct QuestAnnotationView: View {
             withAnimation(GQTheme.bouncy) {
                 isAppearing = true
             }
-        }
-    }
-
-    // MARK: - 3D Model Resolution
-
-    /// Returns the best available GLB model name for this quest's difficulty,
-    /// or nil when no suitable GLB is in the bundle (triggers 2D fallback).
-    private func resolvedModelName() -> String? {
-        let loader = GLBAssetLoader.shared
-
-        switch data.difficulty {
-        case .easy:
-            if loader.isAvailable(named: "map_object_tree")  { return "map_object_tree" }
-            if loader.isAvailable(named: "map_marker_quest") { return "map_marker_quest" }
-            return nil
-
-        case .medium:
-            if loader.isAvailable(named: "map_marker_quest") { return "map_marker_quest" }
-            return nil
-
-        case .hard:
-            if loader.isAvailable(named: "map_object_chest") { return "map_object_chest" }
-            if loader.isAvailable(named: "map_marker_quest") { return "map_marker_quest" }
-            return nil
-
-        case .expert:
-            if loader.isAvailable(named: "map_object_flag")  { return "map_object_flag" }
-            if loader.isAvailable(named: "map_marker_quest") { return "map_marker_quest" }
-            return nil
         }
     }
 

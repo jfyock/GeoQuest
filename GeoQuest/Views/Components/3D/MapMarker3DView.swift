@@ -1,29 +1,20 @@
 import SwiftUI
 import RealityKit
 
-/// A lightweight 3D model view for map annotation pins.
+/// A 3D model view for a single map annotation pin.
 ///
-/// Uses `Model3D` instead of `RealityView` — `Model3D` shares a single GPU render
-/// context across all instances on screen, so having 10-15 quest pins simultaneously
-/// visible doesn't exhaust Metal allocations the way individual `RealityView` instances
-/// would.  `RealityView` is reserved for the single full-featured avatar on the
-/// customisation screen.
-///
-/// The GLB model's own baked-in materials are displayed as designed (tree, chest,
-/// flag, etc. each have their natural colours). The difficulty dot and completion
-/// badge continue to be drawn as SwiftUI overlays in `QuestAnnotationView`.
+/// Uses `RealityView` to render a GLB asset. This is intentionally limited to
+/// **one instance at a time** on screen (the player marker). Quest pins use the
+/// 2D path in `QuestAnnotationView` to avoid GPU exhaustion from multiple
+/// concurrent Metal render contexts.
 struct MapMarker3DView: View {
 
     let modelName: String
 
     var body: some View {
-        if let url = Bundle.main.url(forResource: modelName, withExtension: "glb") {
-            Model3D(url: url) { model in
-                model
-                    .resizable()
-                    .scaledToFit()
-            } placeholder: {
-                EmptyView()
+        RealityView { content in
+            if let entity = await GLBAssetLoader.shared.entity(named: modelName) {
+                content.add(entity)
             }
         }
     }
