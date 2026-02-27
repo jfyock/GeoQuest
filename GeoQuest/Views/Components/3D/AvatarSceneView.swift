@@ -1,156 +1,106 @@
 import SwiftUI
-import SceneKit
+import RealityKit
 
-/// A SceneKit-backed view that renders the player's 3D avatar using GLB assets.
+/// A RealityKit-backed view that renders the player's 3D avatar using GLB assets.
 ///
 /// Composition:
-///   1. Loads `avatar_body_default.glb` as the base mesh.
-///   2. Applies the chosen body colour as the diffuse material on every geometry surface.
-///   3. Overlays the selected accessory GLB node on top of the body.
-///   4. Uses a soft two-light rig (ambient + directional) so the model reads well
-///      against any background colour.
+///   1. Loads `avatar_body_default.glb` via `GLBAssetLoader`.
+///   2. Tints every model surface with the chosen body colour using
+///      `PhysicallyBasedMaterial`.
+///   3. Overlays the selected `avatar_acc_*.glb` accessory entity.
+///   4. Positions a `PerspectiveCamera` entity so the avatar fills the frame.
+///   5. Two `DirectionalLightComponent` entities (key + fill) for pleasant shading.
 ///
-/// The view has a transparent background, letting the parent's SwiftUI background
-/// (e.g. the coloured circle in `AvatarPreviewView`) show through.
+/// Uses `.id(bodyColor + accessory)` so SwiftUI only destroys/recreates the
+/// `RealityView` when the 3D-relevant config changes; entities are served from
+/// `GLBAssetLoader`'s cache so rebuilds are nearly instant (no disk I/O).
 ///
-/// When GLB assets are not yet present in the bundle the view renders nothing —
-/// the parent is responsible for showing the 2D fallback.
-struct AvatarSceneView: UIViewRepresentable {
+/// Renders nothing when GLB assets are absent — the parent `AvatarPreviewView`
+/// shows the 2D fallback in that case.
+struct AvatarSceneView: View {
 
     let config: AvatarConfig
     /// Continuously spins the avatar — enable on the customisation screen.
     var autoRotate: Bool = false
-    /// Z-axis camera distance (tweak per context: larger = further away).
+    /// Camera Z distance (larger = further away / more of the model visible).
     var cameraZ: Float = 2.5
 
-    // MARK: - Coordinator
-
-    final class Coordinator {
-        var lastConfig: AvatarConfig?
-        var lastAutoRotate: Bool?
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    // MARK: - UIViewRepresentable
-
-    func makeUIView(context: Context) -> SCNView {
-        let scnView = SCNView()
-        scnView.backgroundColor = .clear
-        scnView.isOpaque = false
-        scnView.antialiasingMode = .multisampling4X
-        scnView.autoenablesDefaultLighting = false
-        scnView.allowsCameraControl = false
-        scnView.rendersContinuously = autoRotate
-
-        let scene = buildScene(autoRotate: autoRotate)
-        scnView.scene = scene
-        scnView.pointOfView = scene.rootNode.childNode(withName: "camera", recursively: false)
-
-        context.coordinator.lastConfig = config
-        context.coordinator.lastAutoRotate = autoRotate
-        return scnView
-    }
-
-    func updateUIView(_ uiView: SCNView, context: Context) {
-        let configChanged = context.coordinator.lastConfig != config
-        let rotateChanged = context.coordinator.lastAutoRotate != autoRotate
-        guard configChanged || rotateChanged else { return }
-
-        context.coordinator.lastConfig = config
-        context.coordinator.lastAutoRotate = autoRotate
-
-        let scene = buildScene(autoRotate: autoRotate)
-        uiView.scene = scene
-        uiView.pointOfView = scene.rootNode.childNode(withName: "camera", recursively: false)
-        uiView.rendersContinuously = autoRotate
+    var body: some View {
+        RealityView { content in
+            await buildScene(in: &content)
+        }
+        // Rebuild only when body colour or accessory changes (eye/mouth/bg are 2D-only)
+        .id(config.bodyColor.rawValue + config.accessory.rawValue)
     }
 
     // MARK: - Scene Construction
 
-    private func buildScene(autoRotate: Bool) -> SCNScene {
-        let scene = SCNScene()
+    private func buildScene(in content: inout RealityViewContent) async {
+        // Camera
+        let camEntity = Entity()
+        var cam = PerspectiveCamera()
+        cam.fieldOfViewInDegrees = 55
+        camEntity.components.set(cam)
+        camEntity.position = SIMD3<Float>(0, 0.3, cameraZ)
+        camEntity.look(at: .zero, from: camEntity.position, relativeTo: nil)
+        content.add(camEntity)
+
+        // Key light
+        let keyLight = Entity()
+        var key = DirectionalLightComponent()
+        key.intensity = 1200
+        keyLight.components.set(key)
+        keyLight.look(at: .zero, from: SIMD3<Float>(2, 4, 3), relativeTo: nil)
+        content.add(keyLight)
+
+        // Fill light
+        let fillLight = Entity()
+        var fill = DirectionalLightComponent()
+        fill.intensity = 400
+        fillLight.components.set(fill)
+        fillLight.look(at: .zero, from: SIMD3<Float>(-3, 1, 2), relativeTo: nil)
+        content.add(fillLight)
 
         // Body
-        if let bodyNode = GLBAssetLoader.shared.clonedRootNode(named: "avatar_body_default") {
-            applyBodyColor(uiBodyColor(config.bodyColor), to: bodyNode)
-            bodyNode.name = "body"
-
-            if autoRotate {
-                let spin = SCNAction.repeatForever(
-                    .rotateBy(x: 0, y: .pi * 2, z: 0, duration: 8)
-                )
-                bodyNode.runAction(spin)
-            }
-
-            scene.rootNode.addChildNode(bodyNode)
+        if let bodyEntity = await GLBAssetLoader.shared.entity(named: "avatar_body_default") {
+            applyBodyColor(uiBodyColor(config.bodyColor), to: bodyEntity)
+            if autoRotate { addSpin(to: bodyEntity) }
+            content.add(bodyEntity)
         }
 
         // Accessory
         if let accName = accessoryModelName(config.accessory),
-           let accNode = GLBAssetLoader.shared.clonedRootNode(named: accName) {
-            accNode.name = "accessory"
-            if autoRotate {
-                // Inherit the same spin action so accessory moves with body
-                let spin = SCNAction.repeatForever(
-                    .rotateBy(x: 0, y: .pi * 2, z: 0, duration: 8)
-                )
-                accNode.runAction(spin)
-            }
-            scene.rootNode.addChildNode(accNode)
+           let accEntity = await GLBAssetLoader.shared.entity(named: accName) {
+            if autoRotate { addSpin(to: accEntity) }
+            content.add(accEntity)
         }
-
-        // Lighting
-        let ambient = SCNNode()
-        ambient.light = SCNLight()
-        ambient.light?.type = .ambient
-        ambient.light?.intensity = 450
-        ambient.light?.color = UIColor.white
-        scene.rootNode.addChildNode(ambient)
-
-        let key = SCNNode()
-        key.light = SCNLight()
-        key.light?.type = .directional
-        key.light?.intensity = 900
-        key.light?.color = UIColor.white
-        key.position = SCNVector3(2, 4, 3)
-        key.look(at: SCNVector3(0, 0, 0))
-        scene.rootNode.addChildNode(key)
-
-        let fill = SCNNode()
-        fill.light = SCNLight()
-        fill.light?.type = .directional
-        fill.light?.intensity = 350
-        fill.light?.color = UIColor.white
-        fill.position = SCNVector3(-3, 1, 2)
-        fill.look(at: SCNVector3(0, 0, 0))
-        scene.rootNode.addChildNode(fill)
-
-        // Camera
-        let cameraNode = SCNNode()
-        cameraNode.name = "camera"
-        cameraNode.camera = SCNCamera()
-        cameraNode.camera?.fieldOfView = 55
-        cameraNode.camera?.zNear = 0.1
-        cameraNode.camera?.zFar = 100
-        cameraNode.position = SCNVector3(0, 0.3, Double(cameraZ))
-        cameraNode.look(at: SCNVector3(0, 0, 0))
-        scene.rootNode.addChildNode(cameraNode)
-
-        return scene
     }
 
     // MARK: - Helpers
 
-    private func applyBodyColor(_ color: UIColor, to node: SCNNode) {
-        node.enumerateHierarchy { n, _ in
-            guard let geo = n.geometry else { return }
-            geo.materials.forEach { mat in
-                mat.diffuse.contents = color
-                mat.lightingModel = .phong
-                mat.specular.contents = UIColor.white.withAlphaComponent(0.3)
-                mat.shininess = 0.5
+    private func addSpin(to entity: Entity) {
+        let spin = FromToByAnimation<Transform>(
+            by: Transform(rotation: simd_quatf(angle: .pi * 2, axis: [0, 1, 0])),
+            duration: 8,
+            timing: .linear,
+            isAdditive: true
+        )
+        if let resource = try? AnimationResource.generate(with: spin) {
+            entity.playAnimation(resource.repeat())
+        }
+    }
+
+    private func applyBodyColor(_ color: UIColor, to entity: Entity) {
+        if let model = entity as? ModelEntity, var desc = model.model {
+            desc.materials = desc.materials.map { _ in
+                var mat = PhysicallyBasedMaterial()
+                mat.baseColor = .init(tint: color)
+                return mat
             }
+            model.model = desc
+        }
+        for child in entity.children {
+            applyBodyColor(color, to: child)
         }
     }
 

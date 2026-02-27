@@ -1,7 +1,9 @@
-import SceneKit
-import ModelIO
+import RealityKit
 
-/// Loads and caches GLB (binary GLTF) 3D scenes from the app bundle.
+/// Loads and caches GLB (binary GLTF) 3D entities from the app bundle using RealityKit.
+///
+/// SceneKit's ModelIO bridge (`SCNScene(mdlAsset:)`, `SCNNode(mdlObject:)`) was removed
+/// in iOS 26. RealityKit's `Entity.load(contentsOf:)` is the replacement.
 ///
 /// Place GLB files anywhere inside the GeoQuest/ project directory — Xcode's
 /// file-system synchronized group will automatically include them in the bundle.
@@ -14,71 +16,36 @@ import ModelIO
 ///                       avatar_acc_bow.glb
 ///   Map markers:        map_marker_quest.glb, map_marker_player.glb
 ///   Map objects:        map_object_tree.glb, map_object_chest.glb, map_object_flag.glb
-final class GLBAssetLoader: @unchecked Sendable {
+@MainActor
+final class GLBAssetLoader {
     static let shared = GLBAssetLoader()
 
-    private var cache: [String: SCNScene] = [:]
-    private let lock = NSLock()
+    private var cache: [String: Entity] = [:]
 
     private init() {}
-
-    /// Returns a cached or freshly loaded SCNScene for the given GLB model name (no extension).
-    /// Returns nil if the file is not found in the bundle, allowing graceful 2D fallback.
-    func scene(named name: String) -> SCNScene? {
-        lock.lock()
-        defer { lock.unlock() }
-
-        if let cached = cache[name] {
-            return cached
-        }
-
-        guard let url = Bundle.main.url(forResource: name, withExtension: "glb") else {
-            return nil
-        }
-
-        // SCNScene(mdlAsset:) was removed in iOS 26; assemble the scene manually
-        // using SCNNode(mdlObject:) which recursively converts the MDL hierarchy
-        // (meshes, materials, and embedded textures included).
-        let mdlAsset = MDLAsset(url: url)
-        mdlAsset.loadTextures()
-
-        let scene = SCNScene()
-        for index in 0..<mdlAsset.count {
-            let scnNode = SCNNode(mdlObject: mdlAsset.object(at: index))
-            scene.rootNode.addChildNode(scnNode)
-        }
-
-        cache[name] = scene
-        return scene
-    }
 
     /// Returns true when the GLB file is present in the app bundle.
     func isAvailable(named name: String) -> Bool {
         Bundle.main.url(forResource: name, withExtension: "glb") != nil
     }
 
-    /// Returns a deep-cloned node from the named GLB scene so each call site
-    /// gets independent geometry and materials (safe to tint/transform).
-    func clonedRootNode(named name: String) -> SCNNode? {
-        guard let scene = scene(named: name) else { return nil }
-        return deepClone(scene.rootNode)
-    }
-
-    // MARK: - Private
-
-    /// Creates a deep copy of a node hierarchy with independent material instances,
-    /// so color/material changes on the clone don't affect the cached original.
-    private func deepClone(_ node: SCNNode) -> SCNNode {
-        let cloned = node.clone()
-        cloned.enumerateHierarchy { n, _ in
-            guard let geo = n.geometry else { return }
-            let geoCopy = geo.copy() as! SCNGeometry
-            geoCopy.materials = geo.materials.map { mat in
-                let copy = mat.copy() as! SCNMaterial
-                return copy
-            }
-            n.geometry = geoCopy
+    /// Loads the named GLB (or returns a cached clone) as a RealityKit Entity.
+    /// Returns nil when the file is not present in the bundle — callers show 2D fallback.
+    func entity(named name: String) async -> Entity? {
+        // Fast path: return a clone of the cached master entity
+        if let cached = cache[name] {
+            return cached.clone(recursive: true)
         }
-        return cloned
+
+        guard let url = Bundle.main.url(forResource: name, withExtension: "glb") else {
+            return nil
+        }
+
+        guard let loaded = try? await Entity.load(contentsOf: url) else {
+            return nil
+        }
+
+        cache[name] = loaded
+        return loaded.clone(recursive: true)
     }
 }
