@@ -5,75 +5,64 @@ import RealityKit
 ///
 /// Composition:
 ///   1. Loads `avatar_body_default.glb` via `GLBAssetLoader`.
-///   2. Tints every model surface with the chosen body colour using
+///   2. Tints every ModelEntity surface with the chosen body colour using
 ///      `PhysicallyBasedMaterial`.
 ///   3. Overlays the selected `avatar_acc_*.glb` accessory entity.
-///   4. Positions a `PerspectiveCamera` entity so the avatar fills the frame.
-///   5. Two `DirectionalLightComponent` entities (key + fill) for pleasant shading.
+///   4. Two `DirectionalLightComponent` entities (key + fill) for pleasant shading.
 ///
-/// Uses `.id(bodyColor + accessory)` so SwiftUI only destroys/recreates the
-/// `RealityView` when the 3D-relevant config changes; entities are served from
-/// `GLBAssetLoader`'s cache so rebuilds are nearly instant (no disk I/O).
+/// Camera: uses RealityView's default perspective camera.  Position/scale of the
+/// loaded GLB determines framing — adjust in your modelling tool or set
+/// entity.position after load if the model needs repositioning.
 ///
-/// Renders nothing when GLB assets are absent — the parent `AvatarPreviewView`
-/// shows the 2D fallback in that case.
+/// Uses `.id(bodyColor + accessory)` so the RealityView only rebuilds when a
+/// 3D-relevant config property changes; entities are served from `GLBAssetLoader`'s
+/// in-memory cache so rebuilds are nearly instant.
+///
+/// Renders nothing when GLB assets are absent — `AvatarPreviewView` shows the
+/// 2D fallback in that case.
 struct AvatarSceneView: View {
 
     let config: AvatarConfig
     /// Continuously spins the avatar — enable on the customisation screen.
     var autoRotate: Bool = false
-    /// Camera Z distance (larger = further away / more of the model visible).
+    /// Reserved for future camera-distance tuning; not yet wired to an iOS 26
+    /// camera component (PerspectiveCamera lost its Component conformance in iOS 26).
     var cameraZ: Float = 2.5
 
     var body: some View {
         RealityView { content in
-            await buildScene(in: &content)
+            // Key light (upper-right front)
+            let keyLight = Entity()
+            var key = DirectionalLightComponent()
+            key.intensity = 1200
+            keyLight.components.set(key)
+            keyLight.look(at: .zero, from: SIMD3<Float>(2, 4, 3), relativeTo: nil)
+            content.add(keyLight)
+
+            // Fill light (upper-left back)
+            let fillLight = Entity()
+            var fill = DirectionalLightComponent()
+            fill.intensity = 400
+            fillLight.components.set(fill)
+            fillLight.look(at: .zero, from: SIMD3<Float>(-3, 1, 2), relativeTo: nil)
+            content.add(fillLight)
+
+            // Body
+            if let bodyEntity = await GLBAssetLoader.shared.entity(named: "avatar_body_default") {
+                applyBodyColor(uiBodyColor(config.bodyColor), to: bodyEntity)
+                if autoRotate { addSpin(to: bodyEntity) }
+                content.add(bodyEntity)
+            }
+
+            // Accessory
+            if let accName = accessoryModelName(config.accessory),
+               let accEntity = await GLBAssetLoader.shared.entity(named: accName) {
+                if autoRotate { addSpin(to: accEntity) }
+                content.add(accEntity)
+            }
         }
         // Rebuild only when body colour or accessory changes (eye/mouth/bg are 2D-only)
         .id(config.bodyColor.rawValue + config.accessory.rawValue)
-    }
-
-    // MARK: - Scene Construction
-
-    private func buildScene(in content: inout RealityViewContent) async {
-        // Camera
-        let camEntity = Entity()
-        var cam = PerspectiveCamera()
-        cam.fieldOfViewInDegrees = 55
-        camEntity.components.set(cam)
-        camEntity.position = SIMD3<Float>(0, 0.3, cameraZ)
-        camEntity.look(at: .zero, from: camEntity.position, relativeTo: nil)
-        content.add(camEntity)
-
-        // Key light
-        let keyLight = Entity()
-        var key = DirectionalLightComponent()
-        key.intensity = 1200
-        keyLight.components.set(key)
-        keyLight.look(at: .zero, from: SIMD3<Float>(2, 4, 3), relativeTo: nil)
-        content.add(keyLight)
-
-        // Fill light
-        let fillLight = Entity()
-        var fill = DirectionalLightComponent()
-        fill.intensity = 400
-        fillLight.components.set(fill)
-        fillLight.look(at: .zero, from: SIMD3<Float>(-3, 1, 2), relativeTo: nil)
-        content.add(fillLight)
-
-        // Body
-        if let bodyEntity = await GLBAssetLoader.shared.entity(named: "avatar_body_default") {
-            applyBodyColor(uiBodyColor(config.bodyColor), to: bodyEntity)
-            if autoRotate { addSpin(to: bodyEntity) }
-            content.add(bodyEntity)
-        }
-
-        // Accessory
-        if let accName = accessoryModelName(config.accessory),
-           let accEntity = await GLBAssetLoader.shared.entity(named: accName) {
-            if autoRotate { addSpin(to: accEntity) }
-            content.add(accEntity)
-        }
     }
 
     // MARK: - Helpers

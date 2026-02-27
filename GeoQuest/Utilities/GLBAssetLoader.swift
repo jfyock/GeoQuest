@@ -1,3 +1,4 @@
+import Foundation
 import RealityKit
 
 /// Loads and caches GLB (binary GLTF) 3D entities from the app bundle using RealityKit.
