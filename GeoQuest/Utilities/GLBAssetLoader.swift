@@ -1,22 +1,24 @@
 import Foundation
 import RealityKit
 
-/// Loads and caches GLB (binary GLTF) 3D entities from the app bundle using RealityKit.
+/// Loads and caches USDZ 3D entities from the app bundle using RealityKit.
 ///
-/// SceneKit's ModelIO bridge (`SCNScene(mdlAsset:)`, `SCNNode(mdlObject:)`) was removed
-/// in iOS 26. RealityKit's `Entity.load(contentsOf:)` is the replacement.
+/// RealityKit's `Entity.load(contentsOf:)` supports USDZ (`.usdz`) and Reality
+/// Composer bundles (`.reality`). GLB/GLTF is NOT a supported input format —
+/// convert GLB files to USDZ using Reality Composer Pro, Blender, or
+/// `xcrun usdz_converter` before adding them to the project.
 ///
-/// Place GLB files anywhere inside the GeoQuest/ project directory — Xcode's
+/// Place USDZ files anywhere inside the GeoQuest/ project directory — Xcode's
 /// file-system synchronized group will automatically include them in the bundle.
 ///
-/// Expected files:
-///   Avatar body:        avatar_body_default.glb
-///   Avatar accessories: avatar_acc_hat.glb, avatar_acc_crown.glb,
-///                       avatar_acc_glasses.glb, avatar_acc_sunglasses.glb,
-///                       avatar_acc_headband.glb, avatar_acc_antenna.glb,
-///                       avatar_acc_bow.glb
-///   Map markers:        map_marker_quest.glb, map_marker_player.glb
-///   Map objects:        map_object_tree.glb, map_object_chest.glb, map_object_flag.glb
+/// Expected files (USDZ format):
+///   Avatar body:        avatar_body_default.usdz
+///   Avatar accessories: avatar_acc_hat.usdz, avatar_acc_crown.usdz,
+///                       avatar_acc_glasses.usdz, avatar_acc_sunglasses.usdz,
+///                       avatar_acc_headband.usdz, avatar_acc_antenna.usdz,
+///                       avatar_acc_bow.usdz
+///   Map markers:        map_marker_player.usdz
+///   Map objects:        (reserved for future use)
 @MainActor
 final class GLBAssetLoader {
     static let shared = GLBAssetLoader()
@@ -27,7 +29,7 @@ final class GLBAssetLoader {
 
     /// Returns true when the GLB file is present in the app bundle.
     func isAvailable(named name: String) -> Bool {
-        let url = Bundle.main.url(forResource: name, withExtension: "glb")
+        let url = Bundle.main.url(forResource: name, withExtension: "usdz")
         print("[GLBAssetLoader] isAvailable('\(name)'): \(url != nil ? "✅ \(url!.path)" : "❌ not found in bundle")")
         return url != nil
     }
@@ -41,7 +43,7 @@ final class GLBAssetLoader {
             return cached.clone(recursive: true)
         }
 
-        guard let url = Bundle.main.url(forResource: name, withExtension: "glb") else {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "usdz") else {
             print("[GLBAssetLoader] entity('\(name)'): ❌ no bundle URL — file missing from bundle")
             return nil
         }
