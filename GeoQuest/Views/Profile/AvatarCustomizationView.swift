@@ -28,8 +28,8 @@ struct AvatarCustomizationView: View {
     private func customizationContent(viewModel: AvatarViewModel) -> some View {
         ScrollView {
             VStack(spacing: GQTheme.paddingLarge) {
-                // Live preview
-                AvatarPreviewView(config: viewModel.config, size: 120)
+                // Live preview — auto-rotates when the 3D body GLB is present
+                AvatarPreviewView(config: viewModel.config, size: 120, autoRotate: true)
                     .animation(GQTheme.bouncy, value: viewModel.config)
                     .padding(.top, GQTheme.paddingMedium)
 

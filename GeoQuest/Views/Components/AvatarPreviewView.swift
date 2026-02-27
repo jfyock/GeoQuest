@@ -1,68 +1,85 @@
 import SwiftUI
 
+/// Displays the player's avatar at a given size.
+///
+/// **3D mode** — active when `avatar_body_default.glb` is present in the bundle.
+/// Renders a SceneKit scene composed of the body mesh (tinted with the chosen body
+/// colour) and the selected accessory mesh, clipped to a circle.
+///
+/// **2D fallback** — used when GLB assets are not yet added to the project.
+/// Draws the same design as before (coloured circles, SF Symbol accessories, etc.)
+/// so the app works correctly at every stage of asset integration.
 struct AvatarPreviewView: View {
     let config: AvatarConfig
     var size: CGFloat = AppConstants.avatarDefaultSize
+    /// Spin the avatar continuously — enable on the customisation screen.
+    var autoRotate: Bool = false
+
+    private var has3DBody: Bool {
+        GLBAssetLoader.shared.isAvailable(named: "avatar_body_default")
+    }
 
     var body: some View {
         ZStack {
-            // Background circle
             Circle()
                 .fill(backgroundColorValue)
                 .frame(width: size, height: size)
 
-            // Body circle
-            Circle()
-                .fill(bodyColorValue)
-                .frame(width: size * 0.75, height: size * 0.75)
+            if has3DBody {
+                AvatarSceneView(config: config, autoRotate: autoRotate, cameraZ: 2.5)
+                    .frame(width: size * 0.88, height: size * 0.88)
+                    .clipShape(Circle())
+            } else {
+                // 2D fallback — identical to the previous implementation
+                Circle()
+                    .fill(bodyColorValue)
+                    .frame(width: size * 0.75, height: size * 0.75)
 
-            // Eyes
-            eyesView
-                .offset(y: -size * 0.06)
+                eyesView
+                    .offset(y: -size * 0.06)
 
-            // Mouth
-            mouthView
-                .offset(y: size * 0.12)
+                mouthView
+                    .offset(y: size * 0.12)
 
-            // Accessory
-            accessoryView
+                accessoryView
+            }
         }
         .frame(width: size, height: size)
     }
 
-    // MARK: - Body Color
+    // MARK: - Body / Background Colours
 
     private var bodyColorValue: Color {
         switch config.bodyColor {
-        case .red: return .red
+        case .red:    return .red
         case .orange: return .orange
         case .yellow: return .yellow
-        case .green: return .green
-        case .blue: return .blue
+        case .green:  return .green
+        case .blue:   return .blue
         case .indigo: return .indigo
         case .purple: return .purple
-        case .pink: return .pink
-        case .teal: return .teal
-        case .mint: return .mint
-        case .cyan: return .cyan
-        case .brown: return .brown
+        case .pink:   return .pink
+        case .teal:   return .teal
+        case .mint:   return .mint
+        case .cyan:   return .cyan
+        case .brown:  return .brown
         }
     }
 
     private var backgroundColorValue: Color {
         switch config.backgroundColor {
-        case .lightBlue: return Color.blue.opacity(0.2)
-        case .lightGreen: return Color.green.opacity(0.2)
-        case .lightPink: return Color.pink.opacity(0.2)
+        case .lightBlue:   return Color.blue.opacity(0.2)
+        case .lightGreen:  return Color.green.opacity(0.2)
+        case .lightPink:   return Color.pink.opacity(0.2)
         case .lightYellow: return Color.yellow.opacity(0.2)
         case .lightPurple: return Color.purple.opacity(0.2)
         case .lightOrange: return Color.orange.opacity(0.2)
-        case .lightGray: return Color.gray.opacity(0.2)
-        case .white: return Color.white
+        case .lightGray:   return Color.gray.opacity(0.2)
+        case .white:       return Color.white
         }
     }
 
-    // MARK: - Eyes
+    // MARK: - Eyes (2D fallback)
 
     @ViewBuilder
     private var eyesView: some View {
@@ -98,7 +115,7 @@ struct AvatarPreviewView: View {
         }
     }
 
-    // MARK: - Mouth
+    // MARK: - Mouth (2D fallback)
 
     @ViewBuilder
     private var mouthView: some View {
@@ -126,7 +143,7 @@ struct AvatarPreviewView: View {
         }
     }
 
-    // MARK: - Accessory
+    // MARK: - Accessory (2D fallback)
 
     @ViewBuilder
     private var accessoryView: some View {
