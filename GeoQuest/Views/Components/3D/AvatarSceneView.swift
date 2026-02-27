@@ -49,12 +49,14 @@ struct AvatarSceneView: View {
             fillLight.look(at: .zero, from: SIMD3<Float>(-3, 1, 2), relativeTo: nil)
             content.add(fillLight)
 
+            // Root container: body + accessory are children so they scale as one unit.
+            let root = Entity()
+
             // Body
             if let bodyEntity = await GLBAssetLoader.shared.entity(named: "avatar_body_default") {
                 print("[AvatarSceneView] ✅ body entity loaded")
                 applyBodyColor(uiBodyColor(config.bodyColor), to: bodyEntity)
-                if autoRotate { addSpin(to: bodyEntity) }
-                content.add(bodyEntity)
+                root.addChild(bodyEntity)
             } else {
                 print("[AvatarSceneView] ❌ body entity is nil — check GLBAssetLoader logs above")
             }
@@ -63,14 +65,28 @@ struct AvatarSceneView: View {
             if let accName = accessoryModelName(config.accessory) {
                 if let accEntity = await GLBAssetLoader.shared.entity(named: accName) {
                     print("[AvatarSceneView] ✅ accessory '\(accName)' loaded")
-                    if autoRotate { addSpin(to: accEntity) }
-                    content.add(accEntity)
+                    root.addChild(accEntity)
                 } else {
                     print("[AvatarSceneView] ❌ accessory '\(accName)' is nil")
                 }
             } else {
                 print("[AvatarSceneView] ℹ️ no accessory selected")
             }
+
+            // Auto-fit: normalise scale + centre so the avatar is visible regardless of
+            // the GLB's original unit (cm, m, etc.) and the default RealityView camera
+            // position.  Target: largest dimension ≈ 0.8 units, centred on origin.
+            let bounds = root.visualBounds(recursive: true, relativeTo: nil, excludeInactive: false)
+            let maxExtent = max(bounds.extents.x, bounds.extents.y, bounds.extents.z)
+            print("[AvatarSceneView] root bounds — extents=\(bounds.extents) center=\(bounds.center)")
+            if maxExtent > 0.0001 {
+                let scale = Float(0.8) / maxExtent
+                root.scale = SIMD3<Float>(repeating: scale)
+                root.position = -bounds.center * scale
+            }
+
+            if autoRotate { addSpin(to: root) }
+            content.add(root)
         }
         // Rebuild only when body colour or accessory changes (eye/mouth/bg are 2D-only)
         .id(config.bodyColor.rawValue + config.accessory.rawValue)
