@@ -88,7 +88,7 @@ final class GLBAssetLoader {
         }
 
         for i in 0..<asset.count {
-            if let obj = asset.object(at: i) { process(obj, parent: root) }
+            process(asset.object(at: i), parent: root)
         }
 
         print("[GLBAssetLoader] buildEntity('\(label)'): \(meshCount) mesh(es) built")
