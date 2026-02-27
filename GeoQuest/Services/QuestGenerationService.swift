@@ -52,7 +52,7 @@ final class QuestGenerationService {
 
                 // Place quest near the first POI so players start nearby
                 let questCoord = randomOffset(
-                    from: coordinate(of: questPlaces[0]),
+                    from: self.coordinate(of: questPlaces[0]),
                     metersRange: 30...120
                 )
 
