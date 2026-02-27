@@ -110,16 +110,17 @@ final class QuestGenerationService {
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         let empty = StreetInfo(streetName: nil, neighborhood: nil, city: nil, subThoroughfare: nil)
 
-        do {
-            if #available(iOS 26, *) {
-                let request = MKReverseGeocodingRequest(location: location)
-                let mapItems = try await request.mapItems
-                guard let item = mapItems.first else { return empty }
-                // MKAddress provides fullAddress/shortAddress but not structured fields.
-                // Use shortAddress as a neighborhood/city approximation.
-                let city = item.address?.shortAddress
-                return StreetInfo(streetName: nil, neighborhood: city, city: city, subThoroughfare: nil)
-            } else {
+        if #available(iOS 26, *) {
+            // MKReverseGeocodingRequest.mapItems is async but not throwing
+            guard let request = MKReverseGeocodingRequest(location: location) else { return empty }
+            let mapItems = await request.mapItems
+            guard let item = mapItems.first else { return empty }
+            // MKAddress provides fullAddress/shortAddress but not structured fields.
+            // Use shortAddress as a neighborhood/city approximation.
+            let city = item.address?.shortAddress
+            return StreetInfo(streetName: nil, neighborhood: city, city: city, subThoroughfare: nil)
+        } else {
+            do {
                 let geocoder = CLGeocoder()
                 let placemarks = try await geocoder.reverseGeocodeLocation(location)
                 guard let pm = placemarks.first else { return empty }
@@ -129,9 +130,9 @@ final class QuestGenerationService {
                     city: pm.locality,
                     subThoroughfare: pm.subThoroughfare
                 )
+            } catch {
+                return empty
             }
-        } catch {
-            return empty
         }
     }
 

@@ -36,22 +36,25 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     func reverseGeocodeCurrentLocation() async {
         guard let location = currentLocation else { return }
         let clLocation = CLLocation(latitude: location.latitude, longitude: location.longitude)
-        do {
-            if #available(iOS 26, *) {
-                let request = MKReverseGeocodingRequest(location: clLocation)
-                let mapItems = try await request.mapItems
+
+        if #available(iOS 26, *) {
+            // MKReverseGeocodingRequest.mapItems is async but not throwing
+            if let request = MKReverseGeocodingRequest(location: clLocation) {
+                let mapItems = await request.mapItems
                 if let item = mapItems.first, let address = item.address {
                     currentCity = address.shortAddress ?? ""
                 }
-            } else {
+            }
+        } else {
+            do {
                 let geocoder = CLGeocoder()
                 let placemarks = try await geocoder.reverseGeocodeLocation(clLocation)
                 if let city = placemarks.first?.locality {
                     currentCity = city
                 }
+            } catch {
+                // Silently fail - city is optional
             }
-        } catch {
-            // Silently fail - city is optional
         }
     }
 
