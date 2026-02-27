@@ -57,7 +57,7 @@ final class GLBAssetLoader {
 
         // Unique temp file per load to avoid collisions if called concurrently
         let tempURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("\(name)_\(UUID().uuidString).usdz")
+            .appendingPathComponent("\(name)_\(UUID().uuidString).usdc")
 
         // MDLAsset import/export is CPU-bound — run off the main actor
         let exported = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
