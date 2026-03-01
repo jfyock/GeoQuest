@@ -9,6 +9,18 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     private(set) var currentCity: String = ""
     private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
 
+    /// Whether the player is currently moving (GPS speed above threshold).
+    private(set) var isMoving: Bool = false
+    /// The heading direction the player is moving in (radians, 0 = north, clockwise).
+    private(set) var movementHeading: Float = 0
+    /// Current speed in m/s from GPS.
+    private(set) var currentSpeed: Double = 0
+
+    /// Speed threshold (m/s) to consider the player "walking". ~0.5 m/s ≈ slow walk.
+    private static let movementSpeedThreshold: Double = 0.5
+
+    private var previousLocation: CLLocation?
+
     var isAuthorized: Bool {
         authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways
     }
@@ -17,7 +29,7 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
         super.init()
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyBest
-        manager.distanceFilter = 10
+        manager.distanceFilter = 5 // finer updates for movement detection
         authorizationStatus = manager.authorizationStatus
     }
 
@@ -66,8 +78,34 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         Task { @MainActor in
+            let oldLocation = self.previousLocation
             self.currentLocation = location.coordinate
+
+            // Compute speed & heading from GPS
+            let speed = location.speed >= 0 ? location.speed : 0
+            self.currentSpeed = speed
+            self.isMoving = speed >= Self.movementSpeedThreshold
+
+            if let old = oldLocation, self.isMoving {
+                let bearing = self.bearing(from: old.coordinate, to: location.coordinate)
+                self.movementHeading = Float(bearing)
+            } else if location.course >= 0 && self.isMoving {
+                self.movementHeading = Float(location.course * .pi / 180)
+            }
+
+            self.previousLocation = location
         }
+    }
+
+    /// Calculates bearing in radians from one coordinate to another (0 = north, clockwise).
+    private func bearing(from start: CLLocationCoordinate2D, to end: CLLocationCoordinate2D) -> Double {
+        let lat1 = start.latitude * .pi / 180
+        let lat2 = end.latitude * .pi / 180
+        let dLon = (end.longitude - start.longitude) * .pi / 180
+
+        let y = sin(dLon) * cos(lat2)
+        let x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
+        return atan2(y, x)
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {

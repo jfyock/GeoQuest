@@ -29,10 +29,14 @@ struct MapContainerView: View {
 
         ZStack {
             Map(position: $vm.cameraPosition) {
-                // Player avatar
+                // Player avatar with 3D model and movement-aware animation
                 if let location = appState.locationService.currentLocation {
                     Annotation("Me", coordinate: location) {
-                        AvatarMapAnnotationView(config: appState.currentUser?.avatarConfig)
+                        AvatarMapAnnotationView(
+                            config: appState.currentUser?.avatarConfig,
+                            isMoving: appState.locationService.isMoving,
+                            movementHeading: appState.locationService.movementHeading
+                        )
                     }
                 }
 

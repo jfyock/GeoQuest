@@ -28,10 +28,35 @@ struct AvatarCustomizationView: View {
     private func customizationContent(viewModel: AvatarViewModel) -> some View {
         ScrollView {
             VStack(spacing: GQTheme.paddingLarge) {
-                // Live preview
-                AvatarPreviewView(config: viewModel.config, size: 120)
-                    .animation(GQTheme.bouncy, value: viewModel.config)
-                    .padding(.top, GQTheme.paddingMedium)
+                // Live 3D preview with swipe-to-rotate
+                VStack(spacing: 4) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: GQTheme.cornerRadiusLarge)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        GQTheme.secondary.opacity(0.08),
+                                        GQTheme.primary.opacity(0.05)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(height: 240)
+
+                        Avatar3DView(
+                            config: viewModel.config,
+                            size: 200,
+                            allowsInteractiveRotation: true
+                        )
+                        .frame(width: 220, height: 240)
+                    }
+
+                    Text("Swipe to rotate")
+                        .font(GQTheme.caption2Font)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.top, GQTheme.paddingSmall)
 
                 // Body Color
                 sectionView(title: "Body Color", icon: "paintpalette.fill") {

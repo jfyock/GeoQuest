@@ -36,8 +36,32 @@ struct ProfileView: View {
 
     private func profileHeader(user: GQUser) -> some View {
         VStack(spacing: 14) {
-            AvatarPreviewView(config: user.avatarConfig, size: 110)
-                .shadow(color: GQTheme.secondary.opacity(0.3), radius: 12)
+            // Interactive 3D avatar - swipe to rotate
+            ZStack {
+                // Gradient backdrop circle
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [GQTheme.secondary.opacity(0.15), .clear],
+                            center: .center,
+                            startRadius: 20,
+                            endRadius: 90
+                        )
+                    )
+                    .frame(width: 200, height: 200)
+
+                Avatar3DView(
+                    config: user.avatarConfig,
+                    size: 180,
+                    allowsInteractiveRotation: true
+                )
+                .frame(width: 180, height: 200)
+            }
+
+            Text("Swipe to rotate")
+                .font(GQTheme.caption2Font)
+                .foregroundStyle(.tertiary)
+                .padding(.top, -8)
 
             Text(user.displayName)
                 .font(GQTheme.title2Font)
