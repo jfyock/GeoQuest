@@ -94,10 +94,9 @@ final class AvatarAnimationController {
 
         // Head gentle tilt
         if let head = root.childNode(withName: Avatar3DSceneBuilder.NodeName.head, recursively: false) {
-            let baseY = head.position.y
-            let headBobUp = SCNAction.moveTo(y: CGFloat(baseY + 0.04), duration: 1.2)
+            let headBobUp = SCNAction.moveBy(x: 0, y: 0.04, z: 0, duration: 1.2)
             headBobUp.timingMode = .easeInEaseOut
-            let headBobDown = SCNAction.moveTo(y: CGFloat(baseY), duration: 1.2)
+            let headBobDown = headBobUp.reversed()
             headBobDown.timingMode = .easeInEaseOut
 
             let tiltLeft = SCNAction.rotateTo(x: 0, y: 0, z: 0.06, duration: 2.0, usesShortestUnitArc: true)
@@ -159,10 +158,9 @@ final class AvatarAnimationController {
 
         // Head bounce (smaller)
         if let head = root.childNode(withName: Avatar3DSceneBuilder.NodeName.head, recursively: false) {
-            let baseY = head.position.y
-            let up = SCNAction.moveTo(y: CGFloat(baseY + 0.05), duration: walkCycleDuration / 2)
+            let up = SCNAction.moveBy(x: 0, y: 0.05, z: 0, duration: walkCycleDuration / 2)
             up.timingMode = .easeOut
-            let down = SCNAction.moveTo(y: CGFloat(baseY), duration: walkCycleDuration / 2)
+            let down = up.reversed()
             down.timingMode = .easeIn
             head.runAction(.repeatForever(.sequence([up, down])), forKey: "breathe")
         }
