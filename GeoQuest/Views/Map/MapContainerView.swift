@@ -29,13 +29,22 @@ struct MapContainerView: View {
 
         ZStack {
             Map(position: $vm.cameraPosition) {
+                // GPS accuracy radius — flat blue disc on the map ground plane
+                if let location = appState.locationService.currentLocation,
+                   appState.locationService.gpsAccuracy > 0 {
+                    MapCircle(center: location, radius: appState.locationService.gpsAccuracy)
+                        .foregroundStyle(GQTheme.primary.opacity(0.12))
+                        .stroke(GQTheme.primary.opacity(0.3), lineWidth: 1.5)
+                }
+
                 // Player avatar with 3D model and movement-aware animation
                 if let location = appState.locationService.currentLocation {
                     Annotation("Me", coordinate: location) {
                         AvatarMapAnnotationView(
                             config: appState.currentUser?.avatarConfig,
                             isMoving: appState.locationService.isMoving,
-                            movementHeading: appState.locationService.movementHeading
+                            movementHeading: appState.locationService.movementHeading,
+                            mapHeading: viewModel.cameraHeading
                         )
                     }
                 }
@@ -59,9 +68,13 @@ struct MapContainerView: View {
                 MapScaleView()
             }
             .onMapCameraChange(frequency: .onEnd) { context in
+                viewModel.cameraHeading = context.camera.heading
                 Task {
                     await viewModel.loadQuestsForRegion(center: context.camera.centerCoordinate)
                 }
+            }
+            .onMapCameraChange(frequency: .continuous) { context in
+                viewModel.cameraHeading = context.camera.heading
             }
 
             // Floating controls overlay
@@ -94,6 +107,10 @@ struct MapContainerView: View {
                 .padding(.horizontal, GQTheme.paddingMedium)
 
                 Spacer()
+
+                #if DEBUG
+                DebugMovementOverlay(locationService: appState.locationService)
+                #endif
             }
             .padding(.top, 8)
         }

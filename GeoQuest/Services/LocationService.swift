@@ -15,11 +15,19 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     private(set) var movementHeading: Float = 0
     /// Current speed in m/s from GPS.
     private(set) var currentSpeed: Double = 0
+    /// GPS horizontal accuracy in meters (for the map radius circle).
+    private(set) var gpsAccuracy: Double = 0
 
     /// Speed threshold (m/s) to consider the player "walking". ~0.5 m/s ≈ slow walk.
     private static let movementSpeedThreshold: Double = 0.5
 
     private var previousLocation: CLLocation?
+
+    #if DEBUG
+    /// When true, LocationService ignores real GPS and uses simulated position.
+    private(set) var isSimulating = false
+    private var simulateStopTask: Task<Void, Never>?
+    #endif
 
     var isAuthorized: Bool {
         authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways
@@ -78,8 +86,13 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         Task { @MainActor in
+            #if DEBUG
+            guard !self.isSimulating else { return }
+            #endif
+
             let oldLocation = self.previousLocation
             self.currentLocation = location.coordinate
+            self.gpsAccuracy = max(location.horizontalAccuracy, 0)
 
             // Compute speed & heading from GPS
             let speed = location.speed >= 0 ? location.speed : 0
@@ -121,4 +134,73 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         // Location errors are non-fatal for the app
     }
+
+    // MARK: - Debug Movement Simulation
+
+    #if DEBUG
+    enum SimulatedDirection: Sendable {
+        case north, south, east, west
+
+        /// Heading in radians (0 = north, clockwise).
+        var heading: Float {
+            switch self {
+            case .north: return 0
+            case .east: return Float.pi / 2
+            case .south: return Float.pi
+            case .west: return -Float.pi / 2
+            }
+        }
+
+        /// Latitude/longitude delta per step (~11 meters).
+        var latDelta: Double {
+            switch self {
+            case .north: return 0.0001
+            case .south: return -0.0001
+            case .east, .west: return 0
+            }
+        }
+
+        var lonDelta: Double {
+            switch self {
+            case .east: return 0.0001
+            case .west: return -0.0001
+            case .north, .south: return 0
+            }
+        }
+    }
+
+    /// Moves the simulated position one step in the given direction and activates walking.
+    func simulateMovement(direction: SimulatedDirection) {
+        isSimulating = true
+        simulateStopTask?.cancel()
+
+        let current = currentLocation ?? CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
+        currentLocation = CLLocationCoordinate2D(
+            latitude: current.latitude + direction.latDelta,
+            longitude: current.longitude + direction.lonDelta
+        )
+        isMoving = true
+        movementHeading = direction.heading
+        gpsAccuracy = 10
+
+        // Auto-stop after 1 second of no input
+        simulateStopTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.0))
+            guard !Task.isCancelled else { return }
+            self.simulateStop()
+        }
+    }
+
+    /// Stops simulated movement (returns to idle).
+    func simulateStop() {
+        isMoving = false
+    }
+
+    /// Exits simulation mode entirely, returning to real GPS.
+    func exitSimulation() {
+        isSimulating = false
+        simulateStopTask?.cancel()
+        isMoving = false
+    }
+    #endif
 }

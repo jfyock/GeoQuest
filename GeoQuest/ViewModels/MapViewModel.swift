@@ -8,6 +8,8 @@ final class MapViewModel {
     var selectedQuestId: String?
     var isLoadingQuests = false
     var showMenu = false
+    /// Current map camera heading in degrees (0 = north, clockwise).
+    var cameraHeading: Double = 0
 
     private var lastLoadedRegion: MKCoordinateRegion?
     private let questService: QuestService

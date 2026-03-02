@@ -163,12 +163,15 @@ struct Avatar3DView: UIViewRepresentable {
     }
 }
 
-// MARK: - Compact Map Avatar (smaller, optimized for map annotation)
+// MARK: - Compact Map Avatar (isometric, oriented to map ground plane)
 
 struct Avatar3DMapView: UIViewRepresentable {
     let config: AvatarConfig
     var isWalking: Bool = false
     var facingAngle: Float = 0
+    /// Current map camera heading in degrees (0 = north). Used to keep the avatar
+    /// oriented correctly when the user rotates the map.
+    var mapHeading: Double = 0
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -190,14 +193,16 @@ struct Avatar3DMapView: UIViewRepresentable {
 
         Avatar3DSceneBuilder.addLightingPublic(to: scene)
 
-        // Camera closer for map thumbnail
+        // Isometric-style camera: angled from above so avatar appears upright on the map ground
         let cameraNode = SCNNode()
         let camera = SCNCamera()
         camera.fieldOfView = 28
-        camera.usesOrthographicProjection = false
+        camera.usesOrthographicProjection = true
+        camera.orthographicScale = 1.2
         cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0, 0.15, 2.5)
-        cameraNode.look(at: SCNVector3(0, 0.05, 0))
+        // Position above and in front, looking down at ~55 degrees
+        cameraNode.position = SCNVector3(0, 1.8, 1.5)
+        cameraNode.look(at: SCNVector3(0, 0.1, 0))
         scene.rootNode.addChildNode(cameraNode)
 
         scnView.scene = scene
@@ -205,18 +210,26 @@ struct Avatar3DMapView: UIViewRepresentable {
         let controller = AvatarAnimationController(rootNode: rootNode)
         if isWalking {
             controller.playWalking()
-            controller.setFacingDirection(facingAngle)
         } else {
             controller.startInitialAnimation()
         }
+        // Apply initial facing with map heading offset
+        updateFacing(rootNode: rootNode, controller: controller)
+
         context.coordinator.animationController = controller
         context.coordinator.currentIsWalking = isWalking
+        context.coordinator.currentMapHeading = mapHeading
+        context.coordinator.currentFacingAngle = facingAngle
 
         return scnView
     }
 
     func updateUIView(_ scnView: SCNView, context: Context) {
         let coord = context.coordinator
+        guard let scene = scnView.scene,
+              let rootNode = scene.rootNode.childNode(
+                  withName: Avatar3DSceneBuilder.NodeName.root, recursively: false
+              ) else { return }
 
         if coord.currentIsWalking != isWalking {
             coord.currentIsWalking = isWalking
@@ -227,13 +240,29 @@ struct Avatar3DMapView: UIViewRepresentable {
             }
         }
 
-        if isWalking {
-            coord.animationController?.setFacingDirection(facingAngle)
+        // Update facing whenever heading or map rotation changes
+        if coord.currentMapHeading != mapHeading || coord.currentFacingAngle != facingAngle {
+            coord.currentMapHeading = mapHeading
+            coord.currentFacingAngle = facingAngle
+            if let controller = coord.animationController {
+                updateFacing(rootNode: rootNode, controller: controller)
+            }
         }
+    }
+
+    /// Computes the avatar's Y-rotation so it faces its movement direction
+    /// relative to the current map orientation.
+    private func updateFacing(rootNode: SCNNode, controller: AvatarAnimationController) {
+        // Convert map heading from degrees to radians and offset the facing angle
+        let mapHeadingRad = Float(mapHeading * .pi / 180)
+        let adjustedAngle = facingAngle - mapHeadingRad
+        controller.setFacingDirection(adjustedAngle)
     }
 
     final class Coordinator {
         var animationController: AvatarAnimationController?
         var currentIsWalking = false
+        var currentMapHeading: Double = 0
+        var currentFacingAngle: Float = 0
     }
 }

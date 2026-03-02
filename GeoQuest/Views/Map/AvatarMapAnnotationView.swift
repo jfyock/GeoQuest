@@ -4,22 +4,12 @@ struct AvatarMapAnnotationView: View {
     let config: AvatarConfig?
     var isMoving: Bool = false
     var movementHeading: Float = 0
-
-    @State private var isPulsing = false
+    /// Current map camera heading in degrees, so the avatar faces correctly
+    /// regardless of map rotation.
+    var mapHeading: Double = 0
 
     var body: some View {
         ZStack {
-            // Pulse ring
-            Circle()
-                .stroke(GQTheme.primary.opacity(0.3), lineWidth: 2)
-                .frame(width: 72, height: 72)
-                .scaleEffect(isPulsing ? 1.4 : 1.0)
-                .opacity(isPulsing ? 0.0 : 0.6)
-                .animation(
-                    .easeInOut(duration: 2.0).repeatForever(autoreverses: false),
-                    value: isPulsing
-                )
-
             // Direction indicator when walking
             if isMoving {
                 Image(systemName: "arrowtriangle.up.fill")
@@ -34,18 +24,18 @@ struct AvatarMapAnnotationView: View {
                 Avatar3DMapView(
                     config: config,
                     isWalking: isMoving,
-                    facingAngle: movementHeading
+                    facingAngle: movementHeading,
+                    mapHeading: mapHeading
                 )
-                .frame(width: 64, height: 64)
-                .clipShape(Circle())
-                .overlay(
-                    Circle()
-                        .stroke(
-                            isMoving ? GQTheme.success : GQTheme.primary,
-                            lineWidth: 3
-                        )
-                )
-                .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+                .frame(width: 72, height: 80)
+                .overlay(alignment: .bottom) {
+                    // Small shadow ellipse under the avatar's feet
+                    Ellipse()
+                        .fill(.black.opacity(0.18))
+                        .frame(width: 36, height: 10)
+                        .blur(radius: 3)
+                        .offset(y: 4)
+                }
             } else {
                 Circle()
                     .fill(GQTheme.primary)
@@ -58,6 +48,5 @@ struct AvatarMapAnnotationView: View {
                     .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
             }
         }
-        .onAppear { isPulsing = true }
     }
 }

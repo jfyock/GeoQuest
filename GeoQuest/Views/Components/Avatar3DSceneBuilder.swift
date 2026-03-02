@@ -4,6 +4,7 @@ import SwiftUI
 /// Builds a SceneKit scene containing the 3D avatar character with proper body proportions.
 /// The character is a cartoony figure with a spherical head, capsule body, arms, and legs.
 /// Accessories are attached to anatomically correct anchor nodes.
+/// Supports loading custom USDZ models from the app bundle with procedural fallback.
 enum Avatar3DSceneBuilder {
 
     // MARK: - Node Names (used for lookups)
@@ -24,6 +25,43 @@ enum Avatar3DSceneBuilder {
         static let accessory = "accessory"
     }
 
+    // MARK: - USDZ Model Loading
+
+    /// Attempts to load a USDZ or SCN model from the app bundle by name.
+    /// Searches in the bundle root and a "Models" subdirectory.
+    /// Returns nil if no matching file is found (caller should fall back to procedural geometry).
+    static func loadModel(named name: String) -> SCNNode? {
+        let extensions = ["usdz", "scn", "dae"]
+        let directories: [String?] = [nil, "Models", "Resources/Models"]
+
+        for dir in directories {
+            for ext in extensions {
+                if let url = Bundle.main.url(forResource: name, withExtension: ext, subdirectory: dir) {
+                    do {
+                        let scene = try SCNScene(url: url, options: [
+                            .checkConsistency: true
+                        ])
+                        let container = SCNNode()
+                        for child in scene.rootNode.childNodes {
+                            container.addChildNode(child)
+                        }
+                        return container
+                    } catch {
+                        print("[Avatar3D] Failed to load model '\(name).\(ext)': \(error)")
+                    }
+                }
+            }
+        }
+        return nil
+    }
+
+    /// Attempts to load a USDZ accessory model for the given accessory type.
+    /// Convention: file named "accessory_<rawValue>.usdz" (e.g., "accessory_hat.usdz").
+    static func loadAccessoryModel(for accessory: AvatarAccessory) -> SCNNode? {
+        guard accessory != .none else { return nil }
+        return loadModel(named: "accessory_\(accessory.rawValue)")
+    }
+
     // MARK: - Build Full Scene
 
     static func buildScene(config: AvatarConfig, size: CGFloat) -> SCNScene {
@@ -41,6 +79,40 @@ enum Avatar3DSceneBuilder {
     // MARK: - Character Assembly
 
     static func buildCharacter(config: AvatarConfig, scale: CGFloat = 1.0) -> SCNNode {
+        // Try loading a custom USDZ body model first
+        if let customBody = loadModel(named: "avatar_body") {
+            let root = SCNNode()
+            root.name = NodeName.root
+            customBody.name = NodeName.body
+            root.addChildNode(customBody)
+
+            // Create anchor nodes on the custom model for accessories
+            let headAnchor = customBody.childNode(withName: NodeName.head, recursively: true) ?? customBody
+            let hatAnchor = SCNNode()
+            hatAnchor.name = NodeName.hatAnchor
+            hatAnchor.position = SCNVector3(0, 0.35, 0)
+            headAnchor.addChildNode(hatAnchor)
+
+            let glassesAnchor = SCNNode()
+            glassesAnchor.name = NodeName.glassesAnchor
+            glassesAnchor.position = SCNVector3(0, 0.05, 0.35)
+            headAnchor.addChildNode(glassesAnchor)
+
+            // Try loading a custom accessory model, fall back to procedural
+            if config.accessory != .none, let customAccessory = loadAccessoryModel(for: config.accessory) {
+                customAccessory.name = NodeName.accessory
+                let anchor = accessoryAnchorNode(for: config.accessory, on: headAnchor)
+                anchor.addChildNode(customAccessory)
+            } else {
+                let bodyColor = uiColor(for: config.bodyColor)
+                attachAccessory(to: root, headNode: headAnchor, accessory: config.accessory, bodyColor: bodyColor)
+            }
+
+            root.scale = SCNVector3(scale, scale, scale)
+            return root
+        }
+
+        // Procedural fallback
         let root = SCNNode()
         root.name = NodeName.root
 
@@ -447,6 +519,18 @@ enum Avatar3DSceneBuilder {
 
             bowGroup.position = SCNVector3(0.25, 0.2, 0.2)
             headNode.addChildNode(bowGroup)
+        }
+    }
+
+    /// Returns the appropriate anchor node for a given accessory type on a head node.
+    private static func accessoryAnchorNode(for accessory: AvatarAccessory, on headNode: SCNNode) -> SCNNode {
+        switch accessory {
+        case .glasses, .sunglasses:
+            return headNode.childNode(withName: NodeName.glassesAnchor, recursively: true) ?? headNode
+        case .hat, .crown, .headband, .antenna, .bow:
+            return headNode.childNode(withName: NodeName.hatAnchor, recursively: true) ?? headNode
+        case .none:
+            return headNode
         }
     }
 
