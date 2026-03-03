@@ -8,17 +8,23 @@
 import SwiftUI
 
 struct ContentView: View {
-    var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
-    }
-}
+    @State private var appState = AppState()
 
-#Preview {
-    ContentView()
+    var body: some View {
+        Group {
+            switch appState.authPhase {
+            case .loading:
+                LoadingScreenView()
+            case .unauthenticated:
+                AuthGateView()
+            case .authenticated:
+                MainTabView()
+            }
+        }
+        .environment(appState)
+        .task {
+            appState.locationService.requestPermission()
+            await appState.initialize()
+        }
+    }
 }

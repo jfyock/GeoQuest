@@ -9,6 +9,10 @@ import SwiftUI
 
 @main
 struct GeoQuestApp: App {
+    init() {
+        FirebaseConfig.configure()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
