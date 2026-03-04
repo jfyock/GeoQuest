@@ -37,8 +37,8 @@ final class AvatarSkeletonAnimator {
                             if let player = scene.rootNode.animationPlayer(forKey: animKey) {
                                 player.animation.isRemovedOnCompletion = !loop
                                 player.animation.repeatCount = loop ? .infinity : 1
-                                player.animation.fadeInDuration = crossFadeDuration
-                                player.animation.fadeOutDuration = crossFadeDuration
+                                player.animation.blendInDuration = crossFadeDuration
+                                player.animation.blendOutDuration = crossFadeDuration
                                 root.addAnimationPlayer(player, forKey: name)
                                 player.play()
                                 return
