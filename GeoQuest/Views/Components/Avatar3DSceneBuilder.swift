@@ -31,6 +31,12 @@ enum Avatar3DSceneBuilder {
     /// Searches in the bundle root and a "Models" subdirectory.
     /// Returns nil if no matching file is found (caller should fall back to procedural geometry).
     static func loadModel(named name: String) -> SCNNode? {
+        // Try GLB via GLBModelLoader first
+        if let glbNode = GLBModelLoader.loadGLB(named: name) {
+            return glbNode
+        }
+
+        // Fall back to USDZ/SCN/DAE
         let extensions = ["usdz", "scn", "dae"]
         let directories: [String?] = [nil, "Models", "Resources/Models"]
 
@@ -53,6 +59,23 @@ enum Avatar3DSceneBuilder {
             }
         }
         return nil
+    }
+
+    /// Applies the avatar body color to all materials on a loaded model node.
+    static func applyBodyColor(_ color: AvatarBodyColor, to node: SCNNode) {
+        let uiCol = uiColor(for: color)
+        applyColorRecursive(uiCol, to: node)
+    }
+
+    private static func applyColorRecursive(_ color: UIColor, to node: SCNNode) {
+        if let geometry = node.geometry {
+            for material in geometry.materials {
+                material.diffuse.contents = color
+            }
+        }
+        for child in node.childNodes {
+            applyColorRecursive(color, to: child)
+        }
     }
 
     /// Attempts to load a USDZ accessory model for the given accessory type.
@@ -79,7 +102,18 @@ enum Avatar3DSceneBuilder {
     // MARK: - Character Assembly
 
     static func buildCharacter(config: AvatarConfig, scale: CGFloat = 1.0) -> SCNNode {
-        // Try loading a custom USDZ body model first
+        // Try loading a skin variant GLB first (e.g. avatar_body_knight.glb)
+        if let skinId = config.equippedSkinId,
+           let skinBody = GLBModelLoader.loadSkinModel(skinId: skinId) {
+            let root = SCNNode()
+            root.name = NodeName.root
+            skinBody.name = NodeName.body
+            root.addChildNode(skinBody)
+            root.scale = SCNVector3(scale, scale, scale)
+            return root
+        }
+
+        // Try loading a custom body model (USDZ or GLB)
         if let customBody = loadModel(named: "avatar_body") {
             let root = SCNNode()
             root.name = NodeName.root

@@ -45,7 +45,8 @@ struct MapContainerView: View {
                             isMoving: appState.locationService.isMoving,
                             movementHeading: appState.locationService.movementHeading,
                             mapHeading: viewModel.cameraHeading,
-                            zoomScale: viewModel.playerAnnotationScale
+                            zoomScale: viewModel.playerAnnotationScale,
+                            emote: viewModel.activeEmote
                         )
                     }
                 }
@@ -111,11 +112,57 @@ struct MapContainerView: View {
 
                 Spacer()
 
+                HStack {
+                    Spacer()
+
+                    // Emote button
+                    Button {
+                        withAnimation(GQTheme.bouncy) {
+                            viewModel.showEmoteMenu.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "face.smiling.fill")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(GQTheme.accent)
+                            .frame(width: 48, height: 48)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .gqShadow()
+                    }
+                    .buttonStyle(BouncyButtonStyle())
+                    .padding(.trailing, GQTheme.paddingMedium)
+                    .padding(.bottom, GQTheme.paddingSmall)
+                }
+
                 #if DEBUG
                 DebugMovementOverlay(locationService: appState.locationService)
                 #endif
             }
             .padding(.top, 8)
+        }
+        .overlay {
+            if viewModel.showEmoteMenu {
+                let equippedEmoteIds = appState.currentUser?.avatarConfig.equippedEmotes ?? []
+                let availableEmotes = EmoteType.allCases.filter { emote in
+                    // Show default emotes + equipped ones
+                    let defaults: Set<String> = ["wave", "clap", "shrug"]
+                    return defaults.contains(emote.rawValue) || equippedEmoteIds.contains(emote.rawValue)
+                }
+                EmoteMenuView(
+                    availableEmotes: availableEmotes,
+                    onSelectEmote: { emote in
+                        viewModel.activeEmote = emote
+                        // Clear emote after animation plays
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                            viewModel.activeEmote = nil
+                        }
+                    },
+                    onDismiss: {
+                        withAnimation(GQTheme.bouncy) {
+                            viewModel.showEmoteMenu = false
+                        }
+                    }
+                )
+            }
         }
         .sheet(item: $vm.selectedQuestId) { questId in
             QuestDetailView(questId: questId, mapViewModel: viewModel)

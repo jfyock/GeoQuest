@@ -45,14 +45,24 @@ final class QuestDetailViewModel {
         }
     }
 
+    /// Cosmetic item unlocked as a quest reward drop (15% chance).
+    var unlockedCosmetic: CosmeticItem?
+
     private let questService: QuestService
     private let userService: UserService
     private let leaderboardService: LeaderboardService
+    private var cosmeticsService: CosmeticsService?
 
-    init(questService: QuestService, userService: UserService, leaderboardService: LeaderboardService) {
+    init(
+        questService: QuestService,
+        userService: UserService,
+        leaderboardService: LeaderboardService,
+        cosmeticsService: CosmeticsService? = nil
+    ) {
         self.questService = questService
         self.userService = userService
         self.leaderboardService = leaderboardService
+        self.cosmeticsService = cosmeticsService
     }
 
     func loadQuest(id: String, userId: String) async {
@@ -132,6 +142,15 @@ final class QuestDetailViewModel {
                 userId: quest.creatorId,
                 additionalPoints: ScoreCalculator.creatorCompletionBonus
             )
+
+            // Roll for cosmetic drop (15% chance)
+            if let service = cosmeticsService,
+               Double.random(in: 0..<1) < AppConstants.cosmeticDropChance {
+                if let drop = service.rollRandomDrop(excluding: []) {
+                    try? await service.grantCosmetic(cosmeticId: drop.id, userId: userId, method: "quest_drop")
+                    unlockedCosmetic = drop
+                }
+            }
 
             isCompletedByUser = true
             withAnimation(GQTheme.bouncy) {

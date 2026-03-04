@@ -172,6 +172,8 @@ struct Avatar3DMapView: UIViewRepresentable {
     /// Current map camera heading in degrees (0 = north). Used to keep the avatar
     /// oriented correctly when the user rotates the map.
     var mapHeading: Double = 0
+    /// Emote to play on the avatar, if any.
+    var emote: EmoteType?
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -220,6 +222,7 @@ struct Avatar3DMapView: UIViewRepresentable {
         context.coordinator.currentIsWalking = isWalking
         context.coordinator.currentMapHeading = mapHeading
         context.coordinator.currentFacingAngle = facingAngle
+        context.coordinator.currentEmote = emote
 
         return scnView
     }
@@ -248,6 +251,14 @@ struct Avatar3DMapView: UIViewRepresentable {
                 updateFacing(rootNode: rootNode, controller: controller)
             }
         }
+
+        // Play emote if changed
+        if coord.currentEmote != emote {
+            coord.currentEmote = emote
+            if let emote {
+                coord.animationController?.playEmote(emote)
+            }
+        }
     }
 
     /// Computes the avatar's Y-rotation so it faces its movement direction
@@ -264,5 +275,6 @@ struct Avatar3DMapView: UIViewRepresentable {
         var currentIsWalking = false
         var currentMapHeading: Double = 0
         var currentFacingAngle: Float = 0
+        var currentEmote: EmoteType?
     }
 }

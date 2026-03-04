@@ -96,6 +96,22 @@ final class FirestoreService {
         }
     }
 
+    /// Fetches all documents in a collection.
+    func fetchCollection<T: Decodable>(_ collection: String) async throws -> [T] {
+        let snapshot = try await db.collection(collection).getDocuments()
+        return snapshot.documents.compactMap { doc in
+            guard let decoded = try? doc.data(as: T.self) else { return nil }
+            return injectDocumentId(decoded, documentId: doc.documentID)
+        }
+    }
+
+    /// Appends a value to an array field on a document.
+    func appendToArray(collection: String, documentId: String, field: String, value: Any) async throws {
+        try await db.collection(collection).document(documentId).updateData([
+            field: FieldValue.arrayUnion([value])
+        ])
+    }
+
     // Subcollection helpers
     func getSubDocument<T: Decodable>(
         parentCollection: String,

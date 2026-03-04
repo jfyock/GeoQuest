@@ -12,6 +12,8 @@ struct GameMenuView: View {
         case chat = "Global Chat"
         case avatar = "Customize"
         case friends = "Friends"
+        case shop = "Shop"
+        case cosmetics = "Cosmetics"
 
         var id: String { rawValue }
 
@@ -22,6 +24,8 @@ struct GameMenuView: View {
             case .chat: return "bubble.left.and.bubble.right.fill"
             case .avatar: return "person.crop.circle.fill"
             case .friends: return "person.2.fill"
+            case .shop: return "bag.fill"
+            case .cosmetics: return "sparkles"
             }
         }
 
@@ -32,6 +36,8 @@ struct GameMenuView: View {
             case .chat: return GQTheme.success
             case .avatar: return GQTheme.secondary
             case .friends: return GQTheme.pink
+            case .shop: return GQTheme.accent
+            case .cosmetics: return GQTheme.teal
             }
         }
     }
@@ -164,6 +170,10 @@ struct GameMenuView: View {
             AvatarCustomizationView()
         case .friends:
             FriendsView()
+        case .shop:
+            ShopView()
+        case .cosmetics:
+            CosmeticsInventoryView()
         }
     }
 }
@@ -198,6 +208,10 @@ private struct SubMenuSheet: View {
             }
         case .friends:
             FriendsView()
+        case .shop:
+            ShopView()
+        case .cosmetics:
+            CosmeticsInventoryView()
         }
     }
 }

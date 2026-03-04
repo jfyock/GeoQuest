@@ -23,15 +23,20 @@ final class AppState {
     let storageService = StorageService()
     let friendService: FriendService
     let questGenerationService: QuestGenerationService
+    private(set) var cosmeticsService: CosmeticsService?
+    private(set) var storeService: StoreService?
 
     init() {
         let firestore = FirestoreService()
         self.firestoreService = firestore
+        let userSvc = UserService(firestoreService: firestore)
+        self.userService = userSvc
         self.questService = QuestService(firestoreService: firestore)
-        self.userService = UserService(firestoreService: firestore)
         self.leaderboardService = LeaderboardService(firestoreService: firestore)
         self.friendService = FriendService(firestoreService: firestore)
         self.questGenerationService = QuestGenerationService(questService: self.questService)
+        self.cosmeticsService = CosmeticsService(firestoreService: firestore, userService: userSvc)
+        self.storeService = StoreService()
     }
 
     func initialize() async {
@@ -39,6 +44,9 @@ final class AppState {
 
         // Wait briefly for auth state to resolve
         try? await Task.sleep(for: .seconds(1.5))
+
+        // Load cosmetics catalog
+        await cosmeticsService?.loadCatalog()
 
         if let firebaseUser = authService.currentUser {
             await loadUserProfile(uid: firebaseUser.uid)

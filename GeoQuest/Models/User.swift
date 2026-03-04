@@ -11,6 +11,30 @@ struct GQUser: Codable, Identifiable, Sendable {
     var city: String
     var joinedAt: Date
     var lastActiveAt: Date
+    var gems: Int
+    var ownedCosmeticIds: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case id, email, displayName, avatarConfig, totalScore
+        case questsCreated, questsCompleted, city, joinedAt, lastActiveAt
+        case gems, ownedCosmeticIds
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        email = try container.decode(String.self, forKey: .email)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        avatarConfig = try container.decode(AvatarConfig.self, forKey: .avatarConfig)
+        totalScore = try container.decode(Int.self, forKey: .totalScore)
+        questsCreated = try container.decode(Int.self, forKey: .questsCreated)
+        questsCompleted = try container.decode(Int.self, forKey: .questsCompleted)
+        city = try container.decode(String.self, forKey: .city)
+        joinedAt = try container.decode(Date.self, forKey: .joinedAt)
+        lastActiveAt = try container.decode(Date.self, forKey: .lastActiveAt)
+        gems = try container.decodeIfPresent(Int.self, forKey: .gems) ?? 0
+        ownedCosmeticIds = try container.decodeIfPresent([String].self, forKey: .ownedCosmeticIds) ?? []
+    }
 
     init(
         id: String,
@@ -28,5 +52,7 @@ struct GQUser: Codable, Identifiable, Sendable {
         self.city = city
         self.joinedAt = Date()
         self.lastActiveAt = Date()
+        self.gems = 0
+        self.ownedCosmeticIds = []
     }
 }

@@ -29,7 +29,8 @@ struct QuestDetailView: View {
                 let vm = QuestDetailViewModel(
                     questService: appState.questService,
                     userService: appState.userService,
-                    leaderboardService: appState.leaderboardService
+                    leaderboardService: appState.leaderboardService,
+                    cosmeticsService: appState.cosmeticsService
                 )
                 viewModel = vm
                 Task {

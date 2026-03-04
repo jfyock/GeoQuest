@@ -10,6 +10,10 @@ final class MapViewModel {
     var showMenu = false
     /// Current map camera heading in degrees (0 = north, clockwise).
     var cameraHeading: Double = 0
+    /// Currently playing emote on the player's avatar.
+    var activeEmote: EmoteType?
+    /// Whether the emote menu is showing.
+    var showEmoteMenu = false
     /// Current map camera latitude delta for zoom-based scaling.
     var cameraSpanLatitudeDelta: Double = AppConstants.defaultMapSpanDelta
 

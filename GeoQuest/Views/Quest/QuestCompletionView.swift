@@ -6,8 +6,10 @@ struct QuestCompletionView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var showConfetti = false
+    @State private var showUnlockOverlay = false
 
     var body: some View {
+        ZStack {
         ScrollView {
             VStack(spacing: GQTheme.paddingLarge) {
                 Spacer(minLength: 20)
@@ -91,6 +93,23 @@ struct QuestCompletionView: View {
             withAnimation(GQTheme.bouncy) {
                 showConfetti = true
             }
+            if viewModel.unlockedCosmetic != nil {
+                // Delay to let completion celebration play first
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    showUnlockOverlay = true
+                }
+            }
         }
+
+        // Cosmetic unlock overlay
+        if showUnlockOverlay, let cosmetic = viewModel.unlockedCosmetic {
+            CosmeticUnlockView(item: cosmetic) {
+                withAnimation(GQTheme.bouncy) {
+                    showUnlockOverlay = false
+                }
+            }
+            .transition(.opacity)
+        }
+        } // ZStack
     }
 }

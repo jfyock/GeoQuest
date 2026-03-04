@@ -33,6 +33,9 @@ enum AppConstants {
     // Quest proximity
     static let questProximityRadius: Double = 50
 
+    // Cosmetics
+    static let cosmeticDropChance: Double = 0.15
+
     // Loading screen
     static let loadingScreenRotationInterval: TimeInterval = 3.0
 
@@ -62,5 +65,6 @@ enum AppConstants {
         static let leaderboardGlobal = "leaderboard_global"
         static let friendRequests = "friend_requests"
         static let friendships = "friendships"
+        static let cosmetics = "cosmetics"
     }
 }

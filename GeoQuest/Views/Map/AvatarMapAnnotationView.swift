@@ -9,6 +9,8 @@ struct AvatarMapAnnotationView: View {
     var mapHeading: Double = 0
     /// Scale factor driven by map zoom level (0.6x zoomed out – 1.5x zoomed in).
     var zoomScale: CGFloat = 1.0
+    /// Emote to play on the avatar, if any.
+    var emote: EmoteType?
 
     var body: some View {
         ZStack {
@@ -27,7 +29,8 @@ struct AvatarMapAnnotationView: View {
                     config: config,
                     isWalking: isMoving,
                     facingAngle: movementHeading,
-                    mapHeading: mapHeading
+                    mapHeading: mapHeading,
+                    emote: emote
                 )
                 .frame(width: 72, height: 80)
                 .overlay(alignment: .bottom) {
