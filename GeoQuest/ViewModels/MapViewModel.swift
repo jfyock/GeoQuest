@@ -10,6 +10,15 @@ final class MapViewModel {
     var showMenu = false
     /// Current map camera heading in degrees (0 = north, clockwise).
     var cameraHeading: Double = 0
+    /// Current map camera latitude delta for zoom-based scaling.
+    var cameraSpanLatitudeDelta: Double = AppConstants.defaultMapSpanDelta
+
+    /// Scale factor for the player annotation based on current zoom level.
+    /// Returns 1.0 at default span, smaller when zoomed out, larger when zoomed in.
+    var playerAnnotationScale: CGFloat {
+        let normalizedZoom = AppConstants.defaultMapSpanDelta / max(cameraSpanLatitudeDelta, 0.0001)
+        return CGFloat(min(max(normalizedZoom, AppConstants.playerAnnotationMinScale), AppConstants.playerAnnotationMaxScale))
+    }
 
     private var lastLoadedRegion: MKCoordinateRegion?
     private let questService: QuestService

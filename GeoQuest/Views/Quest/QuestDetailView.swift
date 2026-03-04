@@ -154,12 +154,43 @@ struct QuestDetailView: View {
                             .foregroundStyle(GQTheme.success)
                     }
                 } else {
-                    GQButton(title: "Start Quest", icon: "play.fill", color: GQTheme.accent) {
+                    GQGameButton(
+                        title: viewModel.isWithinProximity ? "Start Quest" : "Too Far Away",
+                        icon: viewModel.isWithinProximity ? "play.fill" : "lock.fill",
+                        color: viewModel.isWithinProximity ? GQTheme.accent : .gray,
+                        isDisabled: !viewModel.isWithinProximity
+                    ) {
                         viewModel.startQuest()
+                    }
+
+                    // Proximity status indicator
+                    HStack(spacing: 6) {
+                        Image(systemName: viewModel.isWithinProximity ? "checkmark.circle.fill" : "location.slash.fill")
+                            .foregroundStyle(viewModel.isWithinProximity ? GQTheme.success : GQTheme.warning)
+                        Text(viewModel.proximityMessage)
+                            .font(GQTheme.captionFont)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
             .padding(GQTheme.paddingLarge)
+        }
+        .task(id: questId) {
+            // Continuously update distance to quest based on player location
+            guard let vm = viewModel else { return }
+            while !Task.isCancelled {
+                if let userLocation = appState.locationService.currentLocation, let quest = vm.quest {
+                    let userLoc = CLLocation(latitude: userLocation.latitude, longitude: userLocation.longitude)
+                    let questLoc = CLLocation(latitude: quest.latitude, longitude: quest.longitude)
+                    let newDistance = userLoc.distance(from: questLoc)
+                    if abs(newDistance - vm.distanceToQuest) > 1 {
+                        withAnimation(GQTheme.smooth) {
+                            vm.distanceToQuest = newDistance
+                        }
+                    }
+                }
+                try? await Task.sleep(for: .seconds(1))
+            }
         }
     }
 

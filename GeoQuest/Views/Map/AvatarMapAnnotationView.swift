@@ -7,6 +7,8 @@ struct AvatarMapAnnotationView: View {
     /// Current map camera heading in degrees, so the avatar faces correctly
     /// regardless of map rotation.
     var mapHeading: Double = 0
+    /// Scale factor driven by map zoom level (0.6x zoomed out – 1.5x zoomed in).
+    var zoomScale: CGFloat = 1.0
 
     var body: some View {
         ZStack {
@@ -48,5 +50,7 @@ struct AvatarMapAnnotationView: View {
                     .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
             }
         }
+        .scaleEffect(zoomScale)
+        .animation(GQTheme.smooth, value: zoomScale)
     }
 }

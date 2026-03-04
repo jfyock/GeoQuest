@@ -79,6 +79,10 @@ enum GQTheme {
     static let buttonHeight: CGFloat = 58
     static let inputHeight: CGFloat = 56
 
+    // 3D button constants
+    static let button3DBorderWidth: CGFloat = 4
+    static let button3DEdgeHeight: CGFloat = 6
+
     // MARK: - Shadows
     static func cartoonShadow(color: Color = .black, opacity: Double = 0.15, radius: CGFloat = 12, y: CGFloat = 6) -> some View {
         Color.clear

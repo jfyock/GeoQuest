@@ -1,5 +1,4 @@
 import SwiftUI
-
 struct QuestPlayView: View {
     @Bindable var viewModel: QuestDetailViewModel
     let quest: Quest
@@ -94,7 +93,7 @@ struct QuestPlayView: View {
                     .buttonStyle(BouncyButtonStyle())
                 }
 
-                GQButton(
+                GQGameButton(
                     title: index < quest.steps.count - 1 ? "Next Step" : "Enter Code",
                     icon: index < quest.steps.count - 1 ? "chevron.right" : "key.fill",
                     color: GQTheme.accent
@@ -135,15 +134,25 @@ struct QuestPlayView: View {
                     .foregroundStyle(GQTheme.error)
             }
 
-            GQButton(
-                title: "Submit Code",
-                icon: "checkmark.circle.fill",
-                color: GQTheme.success,
-                isDisabled: viewModel.enteredCode.isEmpty
+            GQGameButton(
+                title: viewModel.isWithinProximity ? "Submit Code" : "Too Far Away",
+                icon: viewModel.isWithinProximity ? "checkmark.circle.fill" : "location.slash.fill",
+                color: viewModel.isWithinProximity ? GQTheme.success : .gray,
+                isDisabled: viewModel.enteredCode.isEmpty || !viewModel.isWithinProximity
             ) {
                 Task {
                     guard let user = appState.currentUser else { return }
                     _ = await viewModel.submitCode(userId: user.id, userDisplayName: user.displayName)
+                }
+            }
+
+            if !viewModel.isWithinProximity {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(GQTheme.warning)
+                    Text("Move closer to the quest to submit")
+                        .font(GQTheme.captionFont)
+                        .foregroundStyle(.secondary)
                 }
             }
 

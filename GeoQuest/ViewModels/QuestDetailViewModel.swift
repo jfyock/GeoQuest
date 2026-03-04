@@ -27,6 +27,24 @@ final class QuestDetailViewModel {
     var feedbackText = ""
     var pointsEarned = 0
 
+    /// Distance in meters from the player to the quest location.
+    var distanceToQuest: Double = .greatestFiniteMagnitude
+
+    /// Whether the player is within the proximity radius to interact with the quest.
+    var isWithinProximity: Bool {
+        distanceToQuest <= AppConstants.questProximityRadius
+    }
+
+    /// Human-readable message describing the proximity status.
+    var proximityMessage: String {
+        if isWithinProximity {
+            return "You're close enough to start!"
+        } else {
+            let remaining = Int(distanceToQuest - AppConstants.questProximityRadius)
+            return "Get \(remaining)m closer to start this quest"
+        }
+    }
+
     private let questService: QuestService
     private let userService: UserService
     private let leaderboardService: LeaderboardService
@@ -51,6 +69,7 @@ final class QuestDetailViewModel {
     }
 
     func startQuest() {
+        guard isWithinProximity else { return }
         startTime = Date()
         withAnimation(GQTheme.bouncy) {
             playState = .playing(currentStep: 0)
@@ -82,6 +101,11 @@ final class QuestDetailViewModel {
 
     func submitCode(userId: String, userDisplayName: String) async -> Bool {
         guard let quest else { return false }
+
+        guard isWithinProximity else {
+            codeError = "You've moved too far from the quest. Get closer to submit."
+            return false
+        }
 
         if enteredCode.uppercased() != quest.secretCode.uppercased() {
             codeError = "Wrong code! Keep searching."

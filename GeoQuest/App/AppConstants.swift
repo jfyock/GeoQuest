@@ -27,6 +27,11 @@ enum AppConstants {
     // Avatar
     static let avatarDefaultSize: CGFloat = 60
     static let avatarMapSize: CGFloat = 44
+    static let playerAnnotationMinScale: CGFloat = 0.6
+    static let playerAnnotationMaxScale: CGFloat = 1.5
+
+    // Quest proximity
+    static let questProximityRadius: Double = 50
 
     // Loading screen
     static let loadingScreenRotationInterval: TimeInterval = 3.0

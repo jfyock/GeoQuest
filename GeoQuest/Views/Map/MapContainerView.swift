@@ -44,7 +44,8 @@ struct MapContainerView: View {
                             config: appState.currentUser?.avatarConfig,
                             isMoving: appState.locationService.isMoving,
                             movementHeading: appState.locationService.movementHeading,
-                            mapHeading: viewModel.cameraHeading
+                            mapHeading: viewModel.cameraHeading,
+                            zoomScale: viewModel.playerAnnotationScale
                         )
                     }
                 }
@@ -69,12 +70,14 @@ struct MapContainerView: View {
             }
             .onMapCameraChange(frequency: .onEnd) { context in
                 viewModel.cameraHeading = context.camera.heading
+                viewModel.cameraSpanLatitudeDelta = context.region.span.latitudeDelta
                 Task {
                     await viewModel.loadQuestsForRegion(center: context.camera.centerCoordinate)
                 }
             }
             .onMapCameraChange(frequency: .continuous) { context in
                 viewModel.cameraHeading = context.camera.heading
+                viewModel.cameraSpanLatitudeDelta = context.region.span.latitudeDelta
             }
 
             // Floating controls overlay

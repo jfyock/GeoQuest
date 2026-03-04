@@ -41,7 +41,7 @@ struct LoginView: View {
             }
 
             // Sign In Button
-            GQButton(
+            GQGameButton(
                 title: "Sign In",
                 icon: "arrow.right",
                 color: GQTheme.primary,

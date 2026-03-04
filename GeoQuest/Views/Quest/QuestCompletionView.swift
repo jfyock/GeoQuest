@@ -80,7 +80,7 @@ struct QuestCompletionView: View {
                 }
 
                 // Return button
-                GQButton(title: "Return to Map", icon: "map.fill", color: GQTheme.primary) {
+                GQGameButton(title: "Return to Map", icon: "map.fill", color: GQTheme.primary) {
                     dismiss()
                 }
                 .padding(.top, GQTheme.paddingMedium)
