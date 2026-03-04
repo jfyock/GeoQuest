@@ -23,7 +23,7 @@ final class CosmeticsService {
             let items: [CosmeticItem] = try await firestoreService.fetchCollection(
                 AppConstants.Collections.cosmetics
             )
-            catalog = items
+            catalog = items.isEmpty ? Self.defaultCatalog : items
         } catch {
             print("[CosmeticsService] Failed to load catalog: \(error)")
             // Use built-in defaults as fallback

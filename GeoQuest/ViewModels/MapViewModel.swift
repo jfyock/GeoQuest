@@ -18,10 +18,11 @@ final class MapViewModel {
     var cameraSpanLatitudeDelta: Double = AppConstants.defaultMapSpanDelta
 
     /// Scale factor for the player annotation based on current zoom level.
-    /// Returns 1.0 at default span, smaller when zoomed out, larger when zoomed in.
+    /// Continuously tracks zoom so the avatar appears a fixed size on screen
+    /// regardless of how far you zoom in or out.
     var playerAnnotationScale: CGFloat {
         let normalizedZoom = AppConstants.defaultMapSpanDelta / max(cameraSpanLatitudeDelta, 0.0001)
-        return CGFloat(min(max(normalizedZoom, AppConstants.playerAnnotationMinScale), AppConstants.playerAnnotationMaxScale))
+        return CGFloat(normalizedZoom)
     }
 
     private var lastLoadedRegion: MKCoordinateRegion?

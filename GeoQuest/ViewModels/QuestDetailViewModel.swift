@@ -39,6 +39,8 @@ final class QuestDetailViewModel {
     var proximityMessage: String {
         if isWithinProximity {
             return "You're close enough to start!"
+        } else if distanceToQuest >= 1_000_000 {
+            return "Calculating distance..."
         } else {
             let remaining = Int(distanceToQuest - AppConstants.questProximityRadius)
             return "Get \(remaining)m closer to start this quest"

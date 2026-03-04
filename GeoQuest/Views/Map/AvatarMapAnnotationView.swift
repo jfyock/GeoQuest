@@ -14,6 +14,23 @@ struct AvatarMapAnnotationView: View {
 
     var body: some View {
         ZStack {
+            // Emote speech bubble above the avatar
+            if let emote {
+                HStack(spacing: 4) {
+                    Image(systemName: emote.iconName)
+                        .font(.system(size: 14, weight: .bold))
+                    Text(emote.displayName)
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(GQTheme.accent, in: Capsule())
+                .offset(y: -56)
+                .transition(.scale.combined(with: .opacity))
+                .animation(GQTheme.bouncy, value: emote)
+            }
+
             // Direction indicator when walking
             if isMoving {
                 Image(systemName: "arrowtriangle.up.fill")
@@ -32,6 +49,7 @@ struct AvatarMapAnnotationView: View {
                     mapHeading: mapHeading,
                     emote: emote
                 )
+                .id(emote?.rawValue ?? "idle")
                 .frame(width: 72, height: 80)
                 .overlay(alignment: .bottom) {
                     // Small shadow ellipse under the avatar's feet
