@@ -177,15 +177,14 @@ struct QuestDetailView: View {
         }
         .task(id: questId) {
             // Continuously update distance to quest based on player location
-            guard let vm = viewModel else { return }
             while !Task.isCancelled {
-                if let userLocation = appState.locationService.currentLocation, let quest = vm.quest {
+                if let userLocation = appState.locationService.currentLocation, let q = viewModel.quest {
                     let userLoc = CLLocation(latitude: userLocation.latitude, longitude: userLocation.longitude)
-                    let questLoc = CLLocation(latitude: quest.latitude, longitude: quest.longitude)
+                    let questLoc = CLLocation(latitude: q.latitude, longitude: q.longitude)
                     let newDistance = userLoc.distance(from: questLoc)
-                    if abs(newDistance - vm.distanceToQuest) > 1 {
+                    if abs(newDistance - viewModel.distanceToQuest) > 1 {
                         withAnimation(GQTheme.smooth) {
-                            vm.distanceToQuest = newDistance
+                            viewModel.distanceToQuest = newDistance
                         }
                     }
                 }
