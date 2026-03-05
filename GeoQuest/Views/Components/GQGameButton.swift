@@ -85,10 +85,11 @@ struct GQGameButton: View {
     private func imageBasedButton(normalImage: String, pressedImage: String) -> some View {
         Button(action: action) {
             ZStack {
-                // 9-slice background
+                // Full-image background (scales to fill)
                 let imgName = isPressed ? pressedImage : normalImage
                 Image(imgName)
-                    .resizable(capInsets: EdgeInsets(top: 20, leading: 30, bottom: 20, trailing: 30), resizingMode: .stretch)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
 
                 // Color tint overlay for non-standard colors
                 if !Self.isStandardColor(color) {
