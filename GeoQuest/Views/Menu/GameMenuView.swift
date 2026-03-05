@@ -91,45 +91,9 @@ struct GameMenuView: View {
                     // Menu grid
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
                         ForEach(Array(MenuSection.allCases.enumerated()), id: \.element.id) { index, section in
-                            Button {
+                            MenuTileButton(section: section) {
                                 selectedSection = section
-                            } label: {
-                                VStack(spacing: 14) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(section.color.opacity(0.15))
-                                            .frame(width: 52, height: 52)
-                                        Image(systemName: section.icon)
-                                            .font(.system(size: 24, weight: .bold))
-                                            .foregroundStyle(section.color)
-                                    }
-
-                                    Text(section.rawValue)
-                                        .font(.system(.caption, design: .rounded, weight: .bold))
-                                        .foregroundStyle(.primary)
-                                        .multilineTextAlignment(.center)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 120)
-                                .background(
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
-                                            .fill(GQTheme.cardBackground)
-                                        RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
-                                            .stroke(section.color.opacity(0.2), lineWidth: 2)
-                                        RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
-                                            .fill(
-                                                LinearGradient(
-                                                    colors: [section.color.opacity(0.08), .clear],
-                                                    startPoint: .top,
-                                                    endPoint: .bottom
-                                                )
-                                            )
-                                    }
-                                )
-                                .gqShadow()
                             }
-                            .buttonStyle(CartoonButtonStyle())
                             .scaleEffect(appeared ? 1 : 0.5)
                             .opacity(appeared ? 1 : 0)
                             .animation(GQTheme.bouncyHeavy.delay(Double(index) * 0.06), value: appeared)
@@ -175,6 +139,94 @@ struct GameMenuView: View {
         case .cosmetics:
             CosmeticsInventoryView()
         }
+    }
+}
+
+/// A single menu tile with a textured button background.
+private struct MenuTileButton: View {
+    let section: GameMenuView.MenuSection
+    let action: () -> Void
+    @State private var isPressed = false
+
+    private var textureName: String {
+        GQGameButton.autoImageName(for: section.color)
+    }
+
+    private var pressedTextureName: String {
+        GQGameButton.autoPressedImageName(for: section.color)
+    }
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                // Textured background
+                if let _ = UIImage(named: textureName) {
+                    let imgName = isPressed ? pressedTextureName : textureName
+                    Image(imgName)
+                        .resizable()
+                        .scaledToFill()
+
+                    // Tint overlay for colors without dedicated textures
+                    if !GQGameButton.isStandardColor(section.color) {
+                        RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
+                            .fill(section.color.opacity(0.4))
+                            .blendMode(.sourceAtop)
+                    }
+                } else {
+                    // Fallback: gradient card
+                    RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
+                        .fill(GQTheme.cardBackground)
+                    RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
+                        .stroke(section.color.opacity(0.2), lineWidth: 2)
+                    RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
+                        .fill(
+                            LinearGradient(
+                                colors: [section.color.opacity(0.08), .clear],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                }
+
+                // Icon + label
+                VStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(.white.opacity(0.2))
+                            .frame(width: 52, height: 52)
+                        Image(systemName: section.icon)
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+
+                    Text(section.rawValue)
+                        .font(.system(.caption, design: .rounded, weight: .bold))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 1)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 120)
+            .clipShape(RoundedRectangle(cornerRadius: GQTheme.cornerRadius))
+            .offset(y: isPressed ? 2 : 0)
+        }
+        .buttonStyle(MenuTileButtonStyle(isPressed: $isPressed))
+        .shadow(color: section.color.opacity(0.3), radius: 6, x: 0, y: 3)
+    }
+}
+
+private struct MenuTileButtonStyle: ButtonStyle {
+    @Binding var isPressed: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
+            .onChange(of: configuration.isPressed) { _, pressed in
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
+                    isPressed = pressed
+                }
+            }
     }
 }
 

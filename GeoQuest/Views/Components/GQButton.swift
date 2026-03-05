@@ -37,7 +37,7 @@ struct GQButtonSmall: View {
                 if let imgName = resolvedImage, UIImage(named: imgName) != nil {
                     Image(imgName)
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
+                        .scaledToFill()
                 } else {
                     Capsule().fill(color)
                     Capsule().fill(

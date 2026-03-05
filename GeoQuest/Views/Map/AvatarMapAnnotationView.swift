@@ -3,11 +3,13 @@ import SwiftUI
 struct AvatarMapAnnotationView: View {
     let config: AvatarConfig?
     var isMoving: Bool = false
-    var movementHeading: Float = 0
+    /// Device compass heading in radians (0 = north, clockwise).
+    /// Used for avatar facing direction — independent of map rotation.
+    var compassHeading: Float = 0
     /// Current map camera heading in degrees, so the avatar faces correctly
     /// regardless of map rotation.
     var mapHeading: Double = 0
-    /// Scale factor driven by map zoom level (0.6x zoomed out – 1.5x zoomed in).
+    /// Scale factor driven by map zoom level.
     var zoomScale: CGFloat = 1.0
     /// Emote to play on the avatar, if any.
     var emote: EmoteType?
@@ -37,7 +39,7 @@ struct AvatarMapAnnotationView: View {
                     .font(.system(size: 10))
                     .foregroundStyle(GQTheme.primary)
                     .offset(y: -42)
-                    .rotationEffect(.radians(Double(movementHeading)))
+                    .rotationEffect(.radians(Double(compassHeading)))
             }
 
             // 3D Avatar or fallback
@@ -45,7 +47,7 @@ struct AvatarMapAnnotationView: View {
                 Avatar3DMapView(
                     config: config,
                     isWalking: isMoving,
-                    facingAngle: movementHeading,
+                    compassHeading: compassHeading,
                     mapHeading: mapHeading,
                     emote: emote
                 )

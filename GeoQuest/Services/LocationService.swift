@@ -18,6 +18,9 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     /// GPS horizontal accuracy in meters (for the map radius circle).
     private(set) var gpsAccuracy: Double = 0
 
+    /// Device compass heading in radians (0 = north, clockwise). Updated via CLHeading.
+    private(set) var compassHeading: Float = 0
+
     /// Speed threshold (m/s) to consider the player "walking". ~0.5 m/s ≈ slow walk.
     private static let movementSpeedThreshold: Double = 0.5
 
@@ -47,10 +50,14 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
 
     func startUpdating() {
         manager.startUpdatingLocation()
+        if CLLocationManager.headingAvailable() {
+            manager.startUpdatingHeading()
+        }
     }
 
     func stopUpdating() {
         manager.stopUpdatingLocation()
+        manager.stopUpdatingHeading()
     }
 
     func reverseGeocodeCurrentLocation() async {
@@ -119,6 +126,13 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
         let y = sin(dLon) * cos(lat2)
         let x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
         return atan2(y, x)
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        guard newHeading.headingAccuracy >= 0 else { return }
+        Task { @MainActor in
+            self.compassHeading = Float(newHeading.trueHeading * .pi / 180)
+        }
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {

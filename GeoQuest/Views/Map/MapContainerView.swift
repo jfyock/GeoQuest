@@ -43,7 +43,7 @@ struct MapContainerView: View {
                         AvatarMapAnnotationView(
                             config: appState.currentUser?.avatarConfig,
                             isMoving: appState.locationService.isMoving,
-                            movementHeading: appState.locationService.movementHeading,
+                            compassHeading: appState.locationService.compassHeading,
                             mapHeading: viewModel.cameraHeading,
                             zoomScale: viewModel.playerAnnotationScale,
                             emote: viewModel.activeEmote

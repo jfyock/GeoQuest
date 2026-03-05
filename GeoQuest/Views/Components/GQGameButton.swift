@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Image-based game button that uses 9-slice background images for a hand-painted
+/// Image-based game button that uses background images for a hand-painted
 /// Clash Royale / Fortnite-style look. Falls back to GQButton3D when image assets
 /// are not available.
 ///
@@ -30,6 +30,8 @@ struct GQGameButton: View {
     var badge: String? = nil
     /// Enable shimmer sweep overlay for call-to-action emphasis.
     var showShimmer: Bool = false
+    /// Explicit height override. When nil, uses the texture's natural aspect ratio.
+    var fixedHeight: CGFloat? = nil
     let action: () -> Void
 
     @State private var isPressed = false
@@ -44,7 +46,6 @@ struct GQGameButton: View {
         if UIImage(named: autoName) != nil {
             return autoName
         }
-        // Last resort: try "button_primary"
         if UIImage(named: "button_primary") != nil {
             return "button_primary"
         }
@@ -84,12 +85,12 @@ struct GQGameButton: View {
 
     private func imageBasedButton(normalImage: String, pressedImage: String) -> some View {
         Button(action: action) {
+            let imgName = isPressed ? pressedImage : normalImage
             ZStack {
-                // Full-image background (scales to fill)
-                let imgName = isPressed ? pressedImage : normalImage
+                // Texture background - stretched to fill the button frame
                 Image(imgName)
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .scaledToFill()
 
                 // Color tint overlay for non-standard colors
                 if !Self.isStandardColor(color) {
@@ -114,6 +115,7 @@ struct GQGameButton: View {
                 }
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 1)
+                .padding(.horizontal, GQTheme.paddingMedium)
 
                 // Shimmer overlay
                 if showShimmer {
@@ -150,7 +152,8 @@ struct GQGameButton: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: GQTheme.buttonHeight)
+            .frame(height: fixedHeight ?? GQTheme.buttonHeight)
+            .clipShape(RoundedRectangle(cornerRadius: GQTheme.cornerRadius))
             .offset(y: isPressed ? 3 : 0)
         }
         .buttonStyle(GameImageButtonStyle(isPressed: $isPressed))
@@ -160,7 +163,7 @@ struct GQGameButton: View {
 
     // MARK: - Color → Image Name Mapping
 
-    private static func autoImageName(for color: Color) -> String {
+    static func autoImageName(for color: Color) -> String {
         switch color {
         case GQTheme.success: return "button_success"
         case GQTheme.error: return "button_danger"
@@ -169,7 +172,7 @@ struct GQGameButton: View {
         }
     }
 
-    private static func autoPressedImageName(for color: Color) -> String {
+    static func autoPressedImageName(for color: Color) -> String {
         switch color {
         case GQTheme.success: return "button_success_pressed"
         case GQTheme.error: return "button_danger_pressed"
@@ -179,7 +182,7 @@ struct GQGameButton: View {
     }
 
     /// Whether the color has a dedicated texture (no tint overlay needed).
-    private static func isStandardColor(_ color: Color) -> Bool {
+    static func isStandardColor(_ color: Color) -> Bool {
         color == GQTheme.primary || color == GQTheme.accent ||
         color == GQTheme.success || color == GQTheme.error || color == .gray
     }

@@ -163,17 +163,22 @@ struct Avatar3DView: UIViewRepresentable {
     }
 }
 
-// MARK: - Compact Map Avatar (isometric, oriented to map ground plane)
+// MARK: - Compact Map Avatar (perpendicular to map ground plane, compass-oriented)
 
 struct Avatar3DMapView: UIViewRepresentable {
     let config: AvatarConfig
     var isWalking: Bool = false
-    var facingAngle: Float = 0
-    /// Current map camera heading in degrees (0 = north). Used to keep the avatar
-    /// oriented correctly when the user rotates the map.
+    /// Device compass heading in radians (0 = north, clockwise).
+    /// The avatar always faces the compass direction, regardless of map rotation.
+    var compassHeading: Float = 0
+    /// Current map camera heading in degrees (0 = north). Used to offset
+    /// the avatar's Y-rotation so it stays locked to compass north when the map rotates.
     var mapHeading: Double = 0
     /// Emote to play on the avatar, if any.
     var emote: EmoteType?
+
+    /// Camera node name for lookup.
+    private static let cameraNodeName = "avatarCamera"
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -197,16 +202,17 @@ struct Avatar3DMapView: UIViewRepresentable {
 
         Avatar3DSceneBuilder.addLightingPublic(to: scene)
 
-        // Isometric-style camera: angled from above so avatar appears upright on the map ground
+        // Camera looking straight at the avatar (front-facing view).
+        // The avatar stands on the XZ ground plane; we look from +Z towards origin.
         let cameraNode = SCNNode()
+        cameraNode.name = Self.cameraNodeName
         let camera = SCNCamera()
-        camera.fieldOfView = 28
         camera.usesOrthographicProjection = true
         camera.orthographicScale = 1.2
         cameraNode.camera = camera
-        // Position above and in front, looking down at ~55 degrees
-        cameraNode.position = SCNVector3(0, 1.8, 1.5)
-        cameraNode.look(at: SCNVector3(0, 0.1, 0))
+        // Position directly in front of the avatar
+        cameraNode.position = SCNVector3(0, 0.4, 3.0)
+        cameraNode.look(at: SCNVector3(0, 0.4, 0))
         scene.rootNode.addChildNode(cameraNode)
 
         scnView.scene = scene
@@ -223,7 +229,7 @@ struct Avatar3DMapView: UIViewRepresentable {
         context.coordinator.animationController = controller
         context.coordinator.currentIsWalking = isWalking
         context.coordinator.currentMapHeading = mapHeading
-        context.coordinator.currentFacingAngle = facingAngle
+        context.coordinator.currentCompassHeading = compassHeading
         context.coordinator.currentEmote = emote
 
         return scnView
@@ -245,10 +251,10 @@ struct Avatar3DMapView: UIViewRepresentable {
             }
         }
 
-        // Update facing whenever heading or map rotation changes
-        if coord.currentMapHeading != mapHeading || coord.currentFacingAngle != facingAngle {
+        // Update facing whenever compass or map rotation changes
+        if coord.currentMapHeading != mapHeading || coord.currentCompassHeading != compassHeading {
             coord.currentMapHeading = mapHeading
-            coord.currentFacingAngle = facingAngle
+            coord.currentCompassHeading = compassHeading
             if let controller = coord.animationController {
                 updateFacing(rootNode: rootNode, controller: controller)
             }
@@ -263,12 +269,15 @@ struct Avatar3DMapView: UIViewRepresentable {
         }
     }
 
-    /// Computes the avatar's Y-rotation so it faces its movement direction
-    /// relative to the current map orientation.
+    /// Computes the avatar's Y-rotation so it faces the device compass direction
+    /// relative to the current map orientation. When the user rotates the map,
+    /// the avatar's on-screen orientation stays locked to real-world compass north.
     private func updateFacing(rootNode: SCNNode, controller: AvatarAnimationController) {
-        // Convert map heading from degrees to radians and offset the facing angle
+        // Compass heading = absolute direction device faces (radians, 0=north, CW)
+        // Map heading = how much the map is rotated from north (degrees, CW)
+        // To keep avatar facing compass direction on screen, subtract map rotation
         let mapHeadingRad = Float(mapHeading * .pi / 180)
-        let adjustedAngle = facingAngle - mapHeadingRad
+        let adjustedAngle = compassHeading - mapHeadingRad
         controller.setFacingDirection(adjustedAngle)
     }
 
@@ -276,7 +285,7 @@ struct Avatar3DMapView: UIViewRepresentable {
         var animationController: AvatarAnimationController?
         var currentIsWalking = false
         var currentMapHeading: Double = 0
-        var currentFacingAngle: Float = 0
+        var currentCompassHeading: Float = 0
         var currentEmote: EmoteType?
     }
 }
