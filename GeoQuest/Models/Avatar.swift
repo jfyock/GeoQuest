@@ -1,6 +1,6 @@
 import Foundation
 
-struct AvatarConfig: Codable, Sendable, Equatable {
+struct AvatarConfig: Codable, Sendable, Equatable, Hashable {
     var bodyColor: AvatarBodyColor
     var eyeStyle: AvatarEyeStyle
     var mouthStyle: AvatarMouthStyle

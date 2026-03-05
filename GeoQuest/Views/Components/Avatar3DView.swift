@@ -183,8 +183,10 @@ struct Avatar3DMapView: UIViewRepresentable {
         let scnView = SCNView()
         scnView.backgroundColor = .clear
         scnView.autoenablesDefaultLighting = false
-        scnView.antialiasingMode = .multisampling2X
+        scnView.antialiasingMode = .multisampling4X
         scnView.preferredFramesPerSecond = 30 // save battery on map
+        // Render at high resolution so the avatar stays sharp when scaled up
+        scnView.contentScaleFactor = UIScreen.main.scale * 2
 
         let scene = SCNScene()
         scene.background.contents = UIColor.clear

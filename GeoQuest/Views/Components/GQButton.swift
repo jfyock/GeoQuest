@@ -1,5 +1,7 @@
 import SwiftUI
 
+/// Standard full-width button. Delegates to GQGameButton so all buttons
+/// automatically pick up texture assets from the catalog when available.
 struct GQButton: View {
     let title: String
     var icon: String? = nil
@@ -9,45 +11,14 @@ struct GQButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                if isLoading {
-                    ProgressView()
-                        .tint(.white)
-                } else {
-                    if let icon {
-                        Image(systemName: icon)
-                            .font(.system(size: 20, weight: .bold))
-                    }
-                    Text(title)
-                        .font(.system(.headline, design: .rounded, weight: .heavy))
-                }
-            }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: GQTheme.buttonHeight)
-            .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
-                        .fill(isDisabled ? color.opacity(0.4) : color)
-                    RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
-                        .fill(
-                            LinearGradient(
-                                colors: [.white.opacity(0.3), .clear],
-                                startPoint: .top,
-                                endPoint: .center
-                            )
-                        )
-                    RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
-                        .stroke(color.opacity(0.6), lineWidth: 3)
-                        .offset(y: 2)
-                        .clipShape(RoundedRectangle(cornerRadius: GQTheme.cornerRadius))
-                }
-            )
-            .shadow(color: color.opacity(0.4), radius: 8, x: 0, y: 4)
-        }
-        .buttonStyle(BouncyButtonStyle())
-        .disabled(isDisabled || isLoading)
+        GQGameButton(
+            title: title,
+            icon: icon,
+            color: color,
+            isLoading: isLoading,
+            isDisabled: isDisabled,
+            action: action
+        )
     }
 }
 
@@ -57,21 +28,17 @@ struct GQButtonSmall: View {
     var color: Color = GQTheme.primary
     let action: () -> Void
 
+    @State private var isPressed = false
+
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
-                if let icon {
-                    Image(systemName: icon)
-                        .font(.system(size: 14, weight: .bold))
-                }
-                Text(title)
-                    .font(.system(.caption, design: .rounded, weight: .bold))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 18)
-            .padding(.vertical, 10)
-            .background(
-                ZStack {
+            ZStack {
+                // Try texture background
+                if let imgName = resolvedImage, UIImage(named: imgName) != nil {
+                    Image(imgName)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
                     Capsule().fill(color)
                     Capsule().fill(
                         LinearGradient(
@@ -81,9 +48,32 @@ struct GQButtonSmall: View {
                         )
                     )
                 }
-            )
+
+                HStack(spacing: 6) {
+                    if let icon {
+                        Image(systemName: icon)
+                            .font(.system(size: 14, weight: .bold))
+                    }
+                    Text(title)
+                        .font(.system(.caption, design: .rounded, weight: .bold))
+                }
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.3), radius: 1, x: 0, y: 1)
+            }
+            .clipShape(Capsule())
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
             .shadow(color: color.opacity(0.35), radius: 6, x: 0, y: 3)
         }
         .buttonStyle(BouncyButtonStyle())
+    }
+
+    private var resolvedImage: String? {
+        switch color {
+        case GQTheme.success: return "button_success"
+        case GQTheme.error: return "button_danger"
+        case .gray: return "button_secondary"
+        default: return "button_primary"
+        }
     }
 }

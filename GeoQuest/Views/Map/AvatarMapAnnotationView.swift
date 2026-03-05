@@ -49,7 +49,7 @@ struct AvatarMapAnnotationView: View {
                     mapHeading: mapHeading,
                     emote: emote
                 )
-                .id(emote?.rawValue ?? "idle")
+                .id("\(config.hashValue)_\(emote?.rawValue ?? "idle")")
                 .frame(width: 72, height: 80)
                 .overlay(alignment: .bottom) {
                     // Small shadow ellipse under the avatar's feet
