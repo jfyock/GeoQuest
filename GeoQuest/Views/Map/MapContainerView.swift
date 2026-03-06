@@ -81,6 +81,9 @@ struct MapContainerView: View {
                 viewModel.cameraSpanLatitudeDelta = context.region.span.latitudeDelta
             }
 
+            // Atmospheric environmental overlay (birds, boats, clouds, leaves)
+            EnvironmentalOverlayView()
+
             // Floating controls overlay
             VStack {
                 HStack {
@@ -101,11 +104,27 @@ struct MapContainerView: View {
 
                     Spacer()
 
-                    // Loading indicator
+                    // Loading indicator or refresh button
                     if viewModel.isLoadingQuests {
                         ProgressView()
                             .frame(width: 44, height: 44)
                             .background(.ultraThinMaterial, in: Circle())
+                    } else {
+                        Button {
+                            Task {
+                                if let location = appState.locationService.currentLocation {
+                                    await viewModel.forceRegenerate(near: location)
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 44, height: 44)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .gqShadow()
+                        }
+                        .buttonStyle(BouncyButtonStyle())
                     }
                 }
                 .padding(.horizontal, GQTheme.paddingMedium)

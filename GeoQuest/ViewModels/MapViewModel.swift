@@ -101,10 +101,12 @@ final class MapViewModel {
         await loadQuestsForRegion(center: coordinate)
     }
 
-    func refreshQuests() async {
+    /// Deactivates stale auto-generated quests and creates a fresh batch for the area.
+    func forceRegenerate(near coordinate: CLLocationCoordinate2D) async {
+        isLoadingQuests = true
+        await questGenerationService.forceRegenerate(near: coordinate)
         lastLoadedRegion = nil
-        if let center = lastLoadedRegion?.center {
-            await loadQuestsForRegion(center: center)
-        }
+        await loadQuestsForRegion(center: coordinate)
+        isLoadingQuests = false
     }
 }

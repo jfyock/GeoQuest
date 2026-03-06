@@ -416,7 +416,9 @@
 				DEVELOPMENT_TEAM = 44G48KU562;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "GeoQuest uses your camera so you can attach a photo to quests you create.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "GeoQuest needs your location to show nearby quests and track your position on the map.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "GeoQuest accesses your photo library so you can choose a cover image for your quests.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -451,7 +453,9 @@
 				DEVELOPMENT_TEAM = 44G48KU562;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "GeoQuest uses your camera so you can attach a photo to quests you create.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "GeoQuest needs your location to show nearby quests and track your position on the map.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "GeoQuest accesses your photo library so you can choose a cover image for your quests.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

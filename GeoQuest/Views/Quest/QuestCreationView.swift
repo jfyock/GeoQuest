@@ -21,6 +21,18 @@ struct QuestCreationView: View {
             .navigationTitle("Create Quest")
             .navigationBarTitleDisplayMode(.large)
         }
+        // Camera sheet is anchored here (stable parent) to avoid SwiftUI sheet bugs
+        .sheet(isPresented: $showCamera) {
+            if let viewModel {
+                CameraPickerView { image in
+                    if let img = image {
+                        withAnimation(GQTheme.smooth) { viewModel.questImage = img }
+                    }
+                    showCamera = false
+                }
+                .ignoresSafeArea()
+            }
+        }
         .onAppear {
             if viewModel == nil {
                 viewModel = QuestCreationViewModel(
@@ -332,15 +344,6 @@ struct QuestCreationView: View {
                             .background(GQTheme.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: GQTheme.cornerRadiusSmall))
                     }
                     .buttonStyle(BouncyButtonStyle())
-                    .sheet(isPresented: $showCamera) {
-                        CameraPickerView { image in
-                            if let img = image {
-                                withAnimation(GQTheme.smooth) { viewModel.questImage = img }
-                            }
-                            showCamera = false
-                        }
-                        .ignoresSafeArea()
-                    }
                 }
             }
         }
