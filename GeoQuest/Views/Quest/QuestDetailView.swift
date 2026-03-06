@@ -74,7 +74,7 @@ struct QuestDetailView: View {
     private func questInfoView(quest: Quest, viewModel: QuestDetailViewModel) -> some View {
         ScrollView {
             VStack(spacing: GQTheme.paddingLarge) {
-                // Cover image (if present)
+                // Cover image (remote URL or generated placeholder)
                 if let imageURLString = quest.imageURL, let imageURL = URL(string: imageURLString) {
                     AsyncImage(url: imageURL) { phase in
                         switch phase {
@@ -86,7 +86,7 @@ struct QuestDetailView: View {
                                 .frame(height: 200)
                                 .clipShape(RoundedRectangle(cornerRadius: GQTheme.cornerRadius))
                         case .failure:
-                            EmptyView()
+                            questPlaceholderImage(quest: quest)
                         case .empty:
                             RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
                                 .fill(Color.secondary.opacity(0.15))
@@ -97,6 +97,8 @@ struct QuestDetailView: View {
                             EmptyView()
                         }
                     }
+                } else {
+                    questPlaceholderImage(quest: quest)
                 }
 
                 // Quest icon
@@ -218,6 +220,47 @@ struct QuestDetailView: View {
                 try? await Task.sleep(for: .seconds(1))
             }
         }
+    }
+
+    private func questPlaceholderImage(quest: Quest) -> some View {
+        ZStack {
+            // Gradient background based on quest color
+            LinearGradient(
+                colors: [
+                    Color(hex: quest.iconColor).opacity(0.6),
+                    Color(hex: quest.iconColor).opacity(0.3),
+                    Color.secondary.opacity(0.15)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            // Large quest icon
+            VStack(spacing: 8) {
+                Image(systemName: quest.iconName)
+                    .font(.system(size: 40, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.8))
+                Text(quest.title)
+                    .font(GQTheme.captionFont)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .lineLimit(1)
+            }
+
+            // Decorative map-pin pattern
+            VStack {
+                HStack {
+                    Spacer()
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.white.opacity(0.1))
+                        .padding(12)
+                }
+                Spacer()
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 200)
+        .clipShape(RoundedRectangle(cornerRadius: GQTheme.cornerRadius))
     }
 
     private func statBadge(icon: String, label: String, color: Color) -> some View {

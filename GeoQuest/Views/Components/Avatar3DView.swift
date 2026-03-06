@@ -174,6 +174,10 @@ struct Avatar3DMapView: UIViewRepresentable {
     /// Current map camera heading in degrees (0 = north). Used to offset
     /// the avatar's Y-rotation so it stays locked to compass north when the map rotates.
     var mapHeading: Double = 0
+    /// Current map camera pitch in degrees (0 = top-down, ~60 = tilted perspective).
+    /// At 0 pitch (top-down) the SceneKit camera looks straight down at the avatar's head.
+    /// As pitch increases, the camera orbits to show the full body.
+    var cameraPitch: Double = 0
     /// Emote to play on the avatar, if any.
     var emote: EmoteType?
 
@@ -202,18 +206,17 @@ struct Avatar3DMapView: UIViewRepresentable {
 
         Avatar3DSceneBuilder.addLightingPublic(to: scene)
 
-        // Camera looking straight at the avatar (front-facing view).
-        // The avatar stands on the XZ ground plane; we look from +Z towards origin.
+        // Camera — orbits the avatar based on map pitch
         let cameraNode = SCNNode()
         cameraNode.name = Self.cameraNodeName
         let camera = SCNCamera()
         camera.usesOrthographicProjection = true
         camera.orthographicScale = 1.2
         cameraNode.camera = camera
-        // Position directly in front of the avatar
-        cameraNode.position = SCNVector3(0, 0.4, 3.0)
-        cameraNode.look(at: SCNVector3(0, 0.4, 0))
         scene.rootNode.addChildNode(cameraNode)
+
+        // Position camera based on initial pitch
+        updateCameraForPitch(cameraNode: cameraNode, pitch: cameraPitch)
 
         scnView.scene = scene
 
@@ -231,6 +234,7 @@ struct Avatar3DMapView: UIViewRepresentable {
         context.coordinator.currentMapHeading = mapHeading
         context.coordinator.currentCompassHeading = compassHeading
         context.coordinator.currentEmote = emote
+        context.coordinator.currentCameraPitch = cameraPitch
 
         return scnView
     }
@@ -260,6 +264,17 @@ struct Avatar3DMapView: UIViewRepresentable {
             }
         }
 
+        // Update camera orbit when map pitch changes
+        if abs(coord.currentCameraPitch - cameraPitch) > 1 {
+            coord.currentCameraPitch = cameraPitch
+            if let cameraNode = scene.rootNode.childNode(withName: Self.cameraNodeName, recursively: false) {
+                SCNTransaction.begin()
+                SCNTransaction.animationDuration = 0.3
+                updateCameraForPitch(cameraNode: cameraNode, pitch: cameraPitch)
+                SCNTransaction.commit()
+            }
+        }
+
         // Play emote if changed
         if coord.currentEmote != emote {
             coord.currentEmote = emote
@@ -269,13 +284,33 @@ struct Avatar3DMapView: UIViewRepresentable {
         }
     }
 
+    /// Orbits the SceneKit camera around the avatar based on map pitch.
+    /// pitch=0 → camera directly above (looking down at head)
+    /// pitch=60+ → camera in front at eye level (showing full body)
+    private func updateCameraForPitch(cameraNode: SCNNode, pitch: Double) {
+        // Normalize pitch: map gives 0 (top-down) to ~60-90 (horizon).
+        // We map this to a SceneKit camera orbit angle:
+        //   0° map pitch → SceneKit camera at 80° above (almost top-down, see head)
+        //   60° map pitch → SceneKit camera at 10° above (front-facing, see body)
+        let clampedPitch = min(max(pitch, 0), 70)
+        let t = clampedPitch / 70.0 // 0 = top-down, 1 = fully tilted
+
+        // Camera orbit: interpolate from top-down to front view
+        let orbitRadius: Float = 3.0
+        // elevation angle from horizontal: 80° (top) down to 10° (front)
+        let elevationDeg = 80.0 - t * 70.0
+        let elevationRad = Float(elevationDeg * .pi / 180)
+
+        let camY = Float(0.4) + orbitRadius * sin(elevationRad)
+        let camZ = orbitRadius * cos(elevationRad)
+
+        cameraNode.position = SCNVector3(0, camY, camZ)
+        cameraNode.look(at: SCNVector3(0, 0.3, 0))
+    }
+
     /// Computes the avatar's Y-rotation so it faces the device compass direction
-    /// relative to the current map orientation. When the user rotates the map,
-    /// the avatar's on-screen orientation stays locked to real-world compass north.
+    /// relative to the current map orientation.
     private func updateFacing(rootNode: SCNNode, controller: AvatarAnimationController) {
-        // Compass heading = absolute direction device faces (radians, 0=north, CW)
-        // Map heading = how much the map is rotated from north (degrees, CW)
-        // To keep avatar facing compass direction on screen, subtract map rotation
         let mapHeadingRad = Float(mapHeading * .pi / 180)
         let adjustedAngle = compassHeading - mapHeadingRad
         controller.setFacingDirection(adjustedAngle)
@@ -286,6 +321,7 @@ struct Avatar3DMapView: UIViewRepresentable {
         var currentIsWalking = false
         var currentMapHeading: Double = 0
         var currentCompassHeading: Float = 0
+        var currentCameraPitch: Double = 0
         var currentEmote: EmoteType?
     }
 }

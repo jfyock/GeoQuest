@@ -45,6 +45,7 @@ struct MapContainerView: View {
                             isMoving: appState.locationService.isMoving,
                             compassHeading: appState.locationService.compassHeading,
                             mapHeading: viewModel.cameraHeading,
+                            cameraPitch: viewModel.cameraPitch,
                             zoomScale: viewModel.playerAnnotationScale,
                             emote: viewModel.activeEmote
                         )
@@ -62,6 +63,13 @@ struct MapContainerView: View {
                             }
                     }
                 }
+
+                // Atmospheric elements anchored to real map coordinates
+                ForEach(viewModel.atmosphericElements) { element in
+                    Annotation("", coordinate: element.coordinate, anchor: .center) {
+                        AtmosphericAnnotationView(element: element)
+                    }
+                }
             }
             .mapStyle(MapStyleConfiguration.cartoonStyle)
             .mapControls {
@@ -71,18 +79,19 @@ struct MapContainerView: View {
             }
             .onMapCameraChange(frequency: .onEnd) { context in
                 viewModel.cameraHeading = context.camera.heading
+                viewModel.cameraPitch = context.camera.pitch
                 viewModel.cameraSpanLatitudeDelta = context.region.span.latitudeDelta
+                viewModel.cameraCenterCoordinate = context.camera.centerCoordinate
                 Task {
                     await viewModel.loadQuestsForRegion(center: context.camera.centerCoordinate)
+                    await viewModel.regenerateAtmosphericElements(center: context.camera.centerCoordinate)
                 }
             }
             .onMapCameraChange(frequency: .continuous) { context in
                 viewModel.cameraHeading = context.camera.heading
+                viewModel.cameraPitch = context.camera.pitch
                 viewModel.cameraSpanLatitudeDelta = context.region.span.latitudeDelta
             }
-
-            // Atmospheric environmental overlay (birds, boats, clouds, leaves)
-            EnvironmentalOverlayView()
 
             // Floating controls overlay
             VStack {
@@ -195,6 +204,8 @@ struct MapContainerView: View {
                 await viewModel.loadQuestsForRegion(center: location)
                 // Generate quests if the area is sparse (runs once per geohash per session)
                 await viewModel.generateQuestsIfNeeded(near: location)
+                // Populate atmospheric world elements around the player
+                await viewModel.regenerateAtmosphericElements(center: location)
             }
         }
     }

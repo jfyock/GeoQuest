@@ -9,6 +9,9 @@ struct AvatarMapAnnotationView: View {
     /// Current map camera heading in degrees, so the avatar faces correctly
     /// regardless of map rotation.
     var mapHeading: Double = 0
+    /// Current map camera pitch in degrees (0 = top-down, 90 = horizon).
+    /// Controls avatar X-rotation so it's perpendicular to the map ground plane.
+    var cameraPitch: Double = 0
     /// Scale factor driven by map zoom level.
     var zoomScale: CGFloat = 1.0
     /// Emote to play on the avatar, if any.
@@ -49,6 +52,7 @@ struct AvatarMapAnnotationView: View {
                     isWalking: isMoving,
                     compassHeading: compassHeading,
                     mapHeading: mapHeading,
+                    cameraPitch: cameraPitch,
                     emote: emote
                 )
                 .id("\(config.hashValue)_\(emote?.rawValue ?? "idle")")

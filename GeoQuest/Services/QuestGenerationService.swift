@@ -89,14 +89,20 @@ final class QuestGenerationService {
                 let questId = try await questService.createQuest(quest)
 
                 // Capture and upload a MapKit snapshot for this quest's area.
-                // Failures are silently swallowed — the quest is usable without an image.
-                if let snapshotData = await captureMapSnapshot(
-                    coordinate: questCoord,
-                    spanMeters: 400
-                ) {
-                    let path = "quests/\(questId)/cover.jpeg"
-                    if let url = try? await storageService.uploadImage(data: snapshotData, path: path) {
-                        try? await questService.updateImageURL(questId: questId, imageURL: url.absoluteString)
+                // Try twice — map tiles may not be cached on first attempt.
+                for attempt in 1...2 {
+                    if let snapshotData = await captureMapSnapshot(
+                        coordinate: questCoord,
+                        spanMeters: 400
+                    ) {
+                        let path = "quests/\(questId)/cover.jpeg"
+                        if let url = try? await storageService.uploadImage(data: snapshotData, path: path) {
+                            try? await questService.updateImageURL(questId: questId, imageURL: url.absoluteString)
+                            break
+                        }
+                    }
+                    if attempt < 2 {
+                        try? await Task.sleep(for: .seconds(1))
                     }
                 }
             }
@@ -454,29 +460,76 @@ final class QuestGenerationService {
 
     // MARK: - Map Snapshot
 
-    /// Captures a satellite-hybrid MapKit snapshot centred on `coordinate`.
-    /// Returns JPEG data or nil if snapshotting fails (e.g. on simulator without tiles).
+    /// Captures a map snapshot centred on `coordinate`.
+    /// Tries satellite imagery first, falls back to standard map style.
+    /// Returns JPEG data or nil if snapshotting fails entirely.
     @MainActor
     private func captureMapSnapshot(
         coordinate: CLLocationCoordinate2D,
         spanMeters: Double
     ) async -> Data? {
-        let options = MKMapSnapshotter.Options()
-        options.region = MKCoordinateRegion(
-            center: coordinate,
-            latitudinalMeters: spanMeters,
-            longitudinalMeters: spanMeters
-        )
-        options.size = CGSize(width: 800, height: 480)
-        options.mapType = .hybridFlyover
+        // Try multiple map types in order of visual quality
+        let mapTypes: [MKMapType] = [.hybrid, .satellite, .standard]
 
-        let snapshotter = MKMapSnapshotter(options: options)
-        do {
-            let snapshot = try await snapshotter.start()
-            return snapshot.image.jpegData(compressionQuality: 0.75)
-        } catch {
-            // Snapshot unavailable (e.g. no map tiles cached) — not a hard failure
-            return nil
+        for mapType in mapTypes {
+            let options = MKMapSnapshotter.Options()
+            options.region = MKCoordinateRegion(
+                center: coordinate,
+                latitudinalMeters: spanMeters,
+                longitudinalMeters: spanMeters
+            )
+            options.size = CGSize(width: 800, height: 480)
+            options.mapType = mapType
+            options.showsBuildings = true
+
+            let snapshotter = MKMapSnapshotter(options: options)
+            do {
+                let snapshot = try await snapshotter.start()
+                // Draw a pin marker on the snapshot center
+                let image = drawPin(on: snapshot)
+                if let data = image.jpegData(compressionQuality: 0.80) {
+                    return data
+                }
+            } catch {
+                continue // Try next map type
+            }
+        }
+        return nil
+    }
+
+    /// Draws a small location pin at the center of the snapshot image.
+    @MainActor
+    private func drawPin(on snapshot: MKMapSnapshotter.Snapshot) -> UIImage {
+        let image = snapshot.image
+        let renderer = UIGraphicsImageRenderer(size: image.size)
+        return renderer.image { ctx in
+            image.draw(at: .zero)
+
+            // Draw a small pin at center
+            let center = CGPoint(x: image.size.width / 2, y: image.size.height / 2)
+            let pinSize: CGFloat = 24
+            let pinRect = CGRect(
+                x: center.x - pinSize / 2,
+                y: center.y - pinSize,
+                width: pinSize,
+                height: pinSize
+            )
+
+            // Pin shadow
+            ctx.cgContext.setFillColor(UIColor.black.withAlphaComponent(0.3).cgColor)
+            ctx.cgContext.fillEllipse(in: CGRect(
+                x: center.x - 8, y: center.y - 2, width: 16, height: 6
+            ))
+
+            // Pin body
+            ctx.cgContext.setFillColor(UIColor(red: 1, green: 0.42, blue: 0.2, alpha: 1).cgColor)
+            ctx.cgContext.fillEllipse(in: pinRect.insetBy(dx: 2, dy: 2))
+
+            // Pin dot
+            ctx.cgContext.setFillColor(UIColor.white.cgColor)
+            ctx.cgContext.fillEllipse(in: CGRect(
+                x: center.x - 4, y: center.y - pinSize + 6, width: 8, height: 8
+            ))
         }
     }
 
