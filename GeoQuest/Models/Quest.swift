@@ -40,6 +40,8 @@ struct Quest: Codable, Identifiable, Sendable {
     var pointValue: Int
     var isActive: Bool
     var createdAt: Date
+    /// Optional cover image URL (Firebase Storage download URL or map snapshot URL).
+    var imageURL: String?
 
     init(
         id: String = "",
@@ -54,7 +56,8 @@ struct Quest: Codable, Identifiable, Sendable {
         iconName: String = "mappin.circle.fill",
         iconColor: String = "FF6B35",
         difficulty: QuestDifficulty = .medium,
-        isActive: Bool = true
+        isActive: Bool = true,
+        imageURL: String? = nil
     ) {
         self.id = id
         self.creatorId = creatorId
@@ -75,5 +78,6 @@ struct Quest: Codable, Identifiable, Sendable {
         self.pointValue = ScoreCalculator.baseQuestValue(stepCount: steps.count)
         self.isActive = isActive
         self.createdAt = Date()
+        self.imageURL = imageURL
     }
 }

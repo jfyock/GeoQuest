@@ -34,7 +34,7 @@ final class AppState {
         self.questService = QuestService(firestoreService: firestore)
         self.leaderboardService = LeaderboardService(firestoreService: firestore)
         self.friendService = FriendService(firestoreService: firestore)
-        self.questGenerationService = QuestGenerationService(questService: self.questService)
+        self.questGenerationService = QuestGenerationService(questService: self.questService, storageService: self.storageService)
         self.cosmeticsService = CosmeticsService(firestoreService: firestore, userService: userSvc)
         self.storeService = StoreService()
     }

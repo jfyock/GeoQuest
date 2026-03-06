@@ -73,6 +73,31 @@ struct QuestDetailView: View {
     private func questInfoView(quest: Quest, viewModel: QuestDetailViewModel) -> some View {
         ScrollView {
             VStack(spacing: GQTheme.paddingLarge) {
+                // Cover image (if present)
+                if let imageURLString = quest.imageURL, let imageURL = URL(string: imageURLString) {
+                    AsyncImage(url: imageURL) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 200)
+                                .clipShape(RoundedRectangle(cornerRadius: GQTheme.cornerRadius))
+                        case .failure:
+                            EmptyView()
+                        case .empty:
+                            RoundedRectangle(cornerRadius: GQTheme.cornerRadius)
+                                .fill(Color.secondary.opacity(0.15))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 200)
+                                .overlay { GQLoadingIndicator() }
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                }
+
                 // Quest icon
                 ZStack {
                     Circle()

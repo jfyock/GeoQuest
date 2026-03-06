@@ -1,10 +1,13 @@
 import CoreLocation
+import PhotosUI
 import SwiftUI
 
 struct QuestCreationView: View {
     @Environment(AppState.self) private var appState
     @State private var viewModel: QuestCreationViewModel?
     @State private var showSuccess = false
+    @State private var showCameraSourcePicker = false
+    @State private var showCamera = false
 
     var body: some View {
         NavigationStack {
@@ -182,6 +185,9 @@ struct QuestCreationView: View {
             }
         }
 
+        // Cover Photo
+        questImageSection(viewModel: viewModel)
+
         // Secret Code
         VStack(alignment: .leading, spacing: 8) {
             Text("Secret Code")
@@ -253,6 +259,89 @@ struct QuestCreationView: View {
                     displayName: user.displayName,
                     currentLocation: appState.locationService.currentLocation
                 )
+            }
+        }
+    }
+
+    // MARK: - Image Section
+
+    @ViewBuilder
+    private func questImageSection(viewModel: QuestCreationViewModel) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Cover Photo")
+                .font(GQTheme.headlineFont)
+            Text("Optional — attach a photo to help players find the quest.")
+                .font(GQTheme.captionFont)
+                .foregroundStyle(.secondary)
+
+            if let image = viewModel.questImage {
+                // Show the selected image with a remove button
+                ZStack(alignment: .topTrailing) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: GQTheme.cornerRadius))
+
+                    Button {
+                        withAnimation(GQTheme.smooth) { viewModel.removeImage() }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.white)
+                            .shadow(radius: 4)
+                    }
+                    .padding(8)
+                }
+            } else if viewModel.isLoadingImage {
+                GQLoadingIndicator()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 180)
+            } else {
+                // Photo picker + camera buttons
+                HStack(spacing: 12) {
+                    PhotosPicker(
+                        selection: Binding(
+                            get: { viewModel.selectedPhotoItem },
+                            set: { item in
+                                viewModel.selectedPhotoItem = item
+                                Task { await viewModel.loadSelectedPhoto() }
+                            }
+                        ),
+                        matching: .images,
+                        photoLibrary: .shared()
+                    ) {
+                        Label("Photo Library", systemImage: "photo.on.rectangle")
+                            .font(GQTheme.headlineFont)
+                            .foregroundStyle(GQTheme.primary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(GQTheme.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: GQTheme.cornerRadiusSmall))
+                    }
+                    .buttonStyle(BouncyButtonStyle())
+
+                    Button {
+                        showCamera = true
+                    } label: {
+                        Label("Camera", systemImage: "camera.fill")
+                            .font(GQTheme.headlineFont)
+                            .foregroundStyle(GQTheme.accent)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(GQTheme.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: GQTheme.cornerRadiusSmall))
+                    }
+                    .buttonStyle(BouncyButtonStyle())
+                    .sheet(isPresented: $showCamera) {
+                        CameraPickerView { image in
+                            if let img = image {
+                                withAnimation(GQTheme.smooth) { viewModel.questImage = img }
+                            }
+                            showCamera = false
+                        }
+                        .ignoresSafeArea()
+                    }
+                }
             }
         }
     }

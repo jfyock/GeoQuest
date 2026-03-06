@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import PhotosUI
 
 @Observable
 final class QuestCreationViewModel {
@@ -21,9 +22,15 @@ final class QuestCreationViewModel {
     var selectedColor = "FF6B35"
     var difficulty: QuestDifficulty = .medium
 
+    // Image attachment
+    var selectedPhotoItem: PhotosPickerItem?
+    var questImage: UIImage?
+    var isLoadingImage = false
+
     private let questService: QuestService
     private let userService: UserService
     private let leaderboardService: LeaderboardService
+    private let storageService = StorageService()
 
     init(questService: QuestService, userService: UserService, leaderboardService: LeaderboardService) {
         self.questService = questService
@@ -69,6 +76,21 @@ final class QuestCreationViewModel {
         }
     }
 
+    func loadSelectedPhoto() async {
+        guard let item = selectedPhotoItem else { return }
+        isLoadingImage = true
+        defer { isLoadingImage = false }
+        if let data = try? await item.loadTransferable(type: Data.self),
+           let image = UIImage(data: data) {
+            questImage = image
+        }
+    }
+
+    func removeImage() {
+        questImage = nil
+        selectedPhotoItem = nil
+    }
+
     func createQuest(userId: String, displayName: String, currentLocation: CLLocationCoordinate2D?) async {
         let location = useCurrentLocation ? currentLocation : selectedLocation
         guard let location else {
@@ -97,6 +119,15 @@ final class QuestCreationViewModel {
             )
 
             let questId = try await questService.createQuest(quest)
+
+            // Upload cover image if one was selected
+            if let image = questImage,
+               let jpegData = image.jpegData(compressionQuality: 0.8) {
+                let path = "quests/\(questId)/cover.jpeg"
+                let url = try await storageService.uploadImage(data: jpegData, path: path)
+                try await questService.updateImageURL(questId: questId, imageURL: url.absoluteString)
+            }
+
             try await userService.incrementQuestsCreated(userId: userId)
             try await userService.updateScore(userId: userId, additionalPoints: ScoreCalculator.questCreationPoints)
 
@@ -117,5 +148,7 @@ final class QuestCreationViewModel {
         selectedIcon = "mappin.circle.fill"
         selectedColor = "FF6B35"
         difficulty = .medium
+        questImage = nil
+        selectedPhotoItem = nil
     }
 }

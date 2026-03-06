@@ -3,13 +3,15 @@ import MapKit
 
 final class QuestGenerationService {
     private let questService: QuestService
+    private let storageService: StorageService
 
     /// Tracks geohashes we've already attempted generation for this session,
     /// preventing redundant searches on repeated map loads.
     private var attemptedGeoHashes: Set<String> = []
 
-    init(questService: QuestService) {
+    init(questService: QuestService, storageService: StorageService = StorageService()) {
         self.questService = questService
+        self.storageService = storageService
     }
 
     // MARK: - Public API
@@ -38,30 +40,50 @@ final class QuestGenerationService {
             )
             guard questsToGenerate > 0 else { return }
 
-            // Fetch real-world map data
+            // Fetch real-world map data — use broader, more varied queries
             let nearbyPlaces = await searchNearbyPlaces(near: coordinate)
             guard nearbyPlaces.count >= 2 else { return }
 
             let streetInfo = await reverseGeocode(coordinate: coordinate)
 
-            // Generate and save each quest
-            for _ in 0..<questsToGenerate {
-                let shuffledPlaces = nearbyPlaces.shuffled()
-                let placeCount = min(shuffledPlaces.count, Int.random(in: 2...4))
-                let questPlaces = Array(shuffledPlaces.prefix(placeCount))
+            // Shuffle the full pool once; each quest picks a non-overlapping slice
+            let shuffledPool = nearbyPlaces.shuffled()
 
-                // Place quest near the first POI so players start nearby
+            for i in 0..<questsToGenerate {
+                // Rotate through the POI pool so each quest anchors to a different place,
+                // spreading quests across the area instead of clustering near one POI.
+                let poolSize = shuffledPool.count
+                let startIndex = (i * 3) % poolSize
+                let placeCount = min(poolSize - startIndex, Int.random(in: 2...4))
+                guard placeCount >= 2 else { continue }
+                let questPlaces = Array(shuffledPool[startIndex..<(startIndex + placeCount)])
+
+                // Place quest near the first POI with a healthy offset for variety.
+                // Use a wider range than before so quests in a batch aren't on top of each other.
                 let questCoord = randomOffset(
                     from: self.coordinate(of: questPlaces[0]),
-                    metersRange: 30...120
+                    metersRange: 40...250
                 )
 
-                let quest = buildQuest(
+                var quest = buildQuest(
                     near: questCoord,
                     places: questPlaces,
                     streetInfo: streetInfo
                 )
-                _ = try await questService.createQuest(quest)
+
+                let questId = try await questService.createQuest(quest)
+
+                // Capture and upload a MapKit snapshot for this quest's area.
+                // Failures are silently swallowed — the quest is usable without an image.
+                if let snapshotData = await captureMapSnapshot(
+                    coordinate: questCoord,
+                    spanMeters: 400
+                ) {
+                    let path = "quests/\(questId)/cover.jpeg"
+                    if let url = try? await storageService.uploadImage(data: snapshotData, path: path) {
+                        try? await questService.updateImageURL(questId: questId, imageURL: url.absoluteString)
+                    }
+                }
             }
         } catch {
             // Quest generation is non-critical — never block the player experience
@@ -72,10 +94,19 @@ final class QuestGenerationService {
     // MARK: - Map Data Fetching
 
     private func searchNearbyPlaces(near coordinate: CLLocationCoordinate2D) async -> [MKMapItem] {
-        // Try two different search queries for variety, stop once we have enough
-        let queries = ["restaurant cafe", "store shop park"].shuffled()
+        // Rotate through multiple query types for variety; collect up to 30 results total.
+        let queryGroups = [
+            ["restaurant", "cafe", "coffee"],
+            ["park", "library", "museum"],
+            ["store", "shop", "pharmacy"],
+            ["hotel", "gym", "theater"],
+        ].shuffled()
 
-        for query in queries {
+        var collected: [MKMapItem] = []
+        var seenNames = Set<String>()
+
+        for queries in queryGroups {
+            let query = queries.randomElement()!
             let request = MKLocalSearch.Request()
             request.naturalLanguageQuery = query
             request.region = MKCoordinateRegion(
@@ -88,15 +119,17 @@ final class QuestGenerationService {
             do {
                 let search = MKLocalSearch(request: request)
                 let response = try await search.start()
-                let items = response.mapItems.filter { $0.name != nil }
-                if items.count >= 2 {
-                    return Array(items.prefix(20))
+                for item in response.mapItems {
+                    guard let name = item.name, !seenNames.contains(name) else { continue }
+                    seenNames.insert(name)
+                    collected.append(item)
                 }
+                if collected.count >= 30 { break }
             } catch {
                 continue
             }
         }
-        return []
+        return collected
     }
 
     private struct StreetInfo {
@@ -115,8 +148,6 @@ final class QuestGenerationService {
             do {
                 let mapItems = try await request.mapItems
                 guard let item = mapItems.first else { return empty }
-                // MKAddress provides fullAddress/shortAddress but not structured fields.
-                // Use shortAddress as a neighborhood/city approximation.
                 let city = item.address?.shortAddress
                 return StreetInfo(streetName: nil, neighborhood: city, city: city, subThoroughfare: nil)
             } catch {
@@ -152,7 +183,6 @@ final class QuestGenerationService {
 
     private func streetName(of item: MKMapItem, fallback: String?) -> String {
         if #available(iOS 26, *) {
-            // MKAddress does not expose thoroughfare. Use reverse-geocoded fallback.
             return fallback ?? "the street"
         }
         return item.placemark.thoroughfare ?? fallback ?? "the street"
@@ -160,7 +190,6 @@ final class QuestGenerationService {
 
     private func addressNumber(of item: MKMapItem) -> String? {
         if #available(iOS 26, *) {
-            // MKAddress does not expose subThoroughfare. Other code strategies are used.
             return nil
         }
         return item.placemark.subThoroughfare
@@ -175,25 +204,29 @@ final class QuestGenerationService {
     ) -> Quest {
         let primaryPlace = places[0]
         let primaryName = primaryPlace.name ?? "the landmark"
-        let streetName = streetName(of: primaryPlace, fallback: streetInfo.streetName)
+        let rawStreet = streetName(of: primaryPlace, fallback: streetInfo.streetName)
+        // Guard against a full address string leaking into the street slot.
+        // A street name should be short — if it looks like a full address (contains digits),
+        // fall back to the neighborhood or a generic placeholder.
+        let streetForTemplate = sanitizeStreetName(rawStreet, area: streetInfo.neighborhood ?? streetInfo.city)
         let area = streetInfo.neighborhood ?? streetInfo.city ?? "the area"
 
         let title = fillTemplate(
             QuestGenerationData.questTitleTemplates.randomElement()!,
-            place: primaryName, street: streetName, area: area
+            place: primaryName, street: streetForTemplate, area: area
         )
 
         let description = fillTemplate(
             QuestGenerationData.questDescriptionTemplates.randomElement()!,
-            place: primaryName, street: streetName, area: area
+            place: primaryName, street: streetForTemplate, area: area
         )
 
-        let steps = generateSteps(places: places, streetInfo: streetInfo)
-        let secretCode = generateSecretCode(from: places)
+        let steps = generateSteps(places: places, streetInfo: streetInfo, sanitizedStreet: streetForTemplate)
+        let secretCode = generateSecretCode(from: places, streetInfo: streetInfo)
         let difficulty = weightedRandomDifficulty()
 
         // Spread creation dates across the past few weeks for a natural feel
-        let daysAgo = Int.random(in: 1...21)
+        let daysAgo = Int.random(in: 1...30)
         let hoursAgo = Int.random(in: 0...23)
         var createdDate = Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date()) ?? Date()
         createdDate = Calendar.current.date(byAdding: .hour, value: -hoursAgo, to: createdDate) ?? createdDate
@@ -216,9 +249,29 @@ final class QuestGenerationService {
         return quest
     }
 
+    /// Strips full addresses from the street slot.
+    /// If the string contains a leading digit sequence (e.g. "123 Main St") it looks like
+    /// a full address; return the area name instead so quest text stays clean.
+    private func sanitizeStreetName(_ raw: String, area: String?) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
+        // Contains leading digit → looks like "123 Main St"
+        if trimmed.first?.isNumber == true {
+            return area ?? "the area"
+        }
+        // Unusually long (> 40 chars) — probably a full address or description
+        if trimmed.count > 40 {
+            return area ?? "the area"
+        }
+        return trimmed.isEmpty ? (area ?? "the area") : trimmed
+    }
+
     // MARK: - Step Generation
 
-    private func generateSteps(places: [MKMapItem], streetInfo: StreetInfo) -> [QuestStep] {
+    private func generateSteps(
+        places: [MKMapItem],
+        streetInfo: StreetInfo,
+        sanitizedStreet: String
+    ) -> [QuestStep] {
         var steps: [QuestStep] = []
         let area = streetInfo.neighborhood ?? streetInfo.city ?? "the area"
         var orderIndex = 0
@@ -226,7 +279,7 @@ final class QuestGenerationService {
         // First step — orient the player
         if let first = places.first {
             let name = first.name ?? "the landmark"
-            let street = streetName(of: first, fallback: streetInfo.streetName)
+            let street = sanitizedStreet
             let instruction = fillTemplate(
                 QuestGenerationData.firstStepTemplates.randomElement()!,
                 place: name, street: street, area: area
@@ -240,7 +293,10 @@ final class QuestGenerationService {
             for i in 1..<(places.count - 1) {
                 let place = places[i]
                 let name = place.name ?? "the next spot"
-                let street = streetName(of: place, fallback: streetInfo.streetName)
+                let street = sanitizeStreetName(
+                    streetName(of: place, fallback: streetInfo.streetName),
+                    area: streetInfo.neighborhood ?? streetInfo.city
+                )
                 let direction = QuestGenerationData.directions.randomElement()!
                 let side = QuestGenerationData.sides.randomElement()!
 
@@ -256,7 +312,7 @@ final class QuestGenerationService {
 
         // Optional observation step for 2-place quests to add depth
         if places.count == 2, Bool.random() {
-            let street = streetInfo.streetName ?? streetName(of: places[0], fallback: nil)
+            let street = sanitizedStreet
             let instruction = fillTemplate(
                 QuestGenerationData.observationStepTemplates.randomElement()!,
                 place: "", street: street, area: area
@@ -268,18 +324,19 @@ final class QuestGenerationService {
         // Final step — find the code
         if let last = places.last, places.count > 1 {
             let name = last.name ?? "your destination"
-            let street = streetName(of: last, fallback: streetInfo.streetName)
+            let street = sanitizeStreetName(
+                streetName(of: last, fallback: streetInfo.streetName),
+                area: streetInfo.neighborhood ?? streetInfo.city
+            )
             let addrNum = addressNumber(of: last)
 
             let instruction: String
             if addrNum != nil {
-                // Code is the address number — use address-based template
                 instruction = fillTemplate(
                     QuestGenerationData.finalStepTemplates.randomElement()!,
                     place: name, street: street, area: area
                 )
             } else if let placeName = last.name, extractNameCode(from: placeName) != nil {
-                // Code is from place name — use name-based template
                 let codeLength = min(6, placeName.filter { $0.isLetter }.count)
                 var tmpl = QuestGenerationData.nameBasedFinalStepTemplates.randomElement()!
                 tmpl = tmpl.replacingOccurrences(of: "{n}", with: "\(codeLength)")
@@ -298,29 +355,61 @@ final class QuestGenerationService {
 
     // MARK: - Secret Code Generation
 
-    private func generateSecretCode(from places: [MKMapItem]) -> String {
-        // Strategy 1: Use address number from the final place
+    private func generateSecretCode(from places: [MKMapItem], streetInfo: StreetInfo) -> String {
+        // Collect all candidate strategies and pick one randomly for variety.
+        var candidates: [String] = []
+
+        // Strategy 1: Address number from the final place
         if let last = places.last,
            let address = addressNumber(of: last),
            address.count >= AppConstants.minSecretCodeLength {
-            return String(address.prefix(AppConstants.maxSecretCodeLength))
+            candidates.append(String(address.prefix(AppConstants.maxSecretCodeLength)))
         }
 
-        // Strategy 2: Use first letters of the last place's name
+        // Strategy 2: First letters of the last place's name (up to 6)
         if let last = places.last, let code = extractNameCode(from: last.name ?? "") {
-            return code
+            candidates.append(code)
         }
 
-        // Strategy 3: Combine initials from multiple places
+        // Strategy 3: Initials from all places (e.g. SBCP for 4 POIs)
         let initials = places
             .compactMap { $0.name?.first }
             .map { String($0).uppercased() }
             .joined()
         if initials.count >= AppConstants.minSecretCodeLength {
-            return String(initials.prefix(AppConstants.maxSecretCodeLength))
+            candidates.append(String(initials.prefix(AppConstants.maxSecretCodeLength)))
         }
 
-        // Fallback: Generate a pronounceable random code
+        // Strategy 4: Word-shaped code — vowel-consonant pattern, easy to type
+        candidates.append(randomPronounceable(length: Int.random(in: 5...6)))
+
+        // Strategy 5: Mixed alphanumeric using place name + a digit
+        if let first = places.first, let name = first.name {
+            let letters = name.uppercased().filter { $0.isLetter }
+            let prefix = String(letters.prefix(3))
+            let suffix = String(Int.random(in: 10...99))
+            let mixed = prefix + suffix
+            if mixed.count >= AppConstants.minSecretCodeLength {
+                candidates.append(mixed)
+            }
+        }
+
+        // Strategy 6: Area-based code (first 4 letters of neighborhood + digit)
+        if let area = streetInfo.neighborhood ?? streetInfo.city {
+            let letters = area.uppercased().filter { $0.isLetter }
+            let areaPrefix = String(letters.prefix(4))
+            let digit = String(Int.random(in: 2...9))
+            let code = areaPrefix + digit
+            if code.count >= AppConstants.minSecretCodeLength {
+                candidates.append(code)
+            }
+        }
+
+        // Pick one candidate at random for maximum variety
+        if let chosen = candidates.randomElement() {
+            return String(chosen.prefix(AppConstants.maxSecretCodeLength))
+        }
+
         return randomCode(length: 6)
     }
 
@@ -333,6 +422,47 @@ final class QuestGenerationService {
     private func randomCode(length: Int) -> String {
         let chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
         return String((0..<length).map { _ in chars.randomElement()! })
+    }
+
+    /// Generates a pronounceable code using alternating consonant-vowel pairs.
+    private func randomPronounceable(length: Int) -> String {
+        let consonants = Array("BCDFGHJKLMNPQRSTVWXYZ")
+        let vowels = Array("AEIOU")
+        var result = ""
+        for i in 0..<length {
+            result += i % 2 == 0
+                ? String(consonants.randomElement()!)
+                : String(vowels.randomElement()!)
+        }
+        return result
+    }
+
+    // MARK: - Map Snapshot
+
+    /// Captures a satellite-hybrid MapKit snapshot centred on `coordinate`.
+    /// Returns JPEG data or nil if snapshotting fails (e.g. on simulator without tiles).
+    @MainActor
+    private func captureMapSnapshot(
+        coordinate: CLLocationCoordinate2D,
+        spanMeters: Double
+    ) async -> Data? {
+        let options = MKMapSnapshotter.Options()
+        options.region = MKCoordinateRegion(
+            center: coordinate,
+            latitudinalMeters: spanMeters,
+            longitudinalMeters: spanMeters
+        )
+        options.size = CGSize(width: 800, height: 480)
+        options.mapType = .hybridFlyover
+
+        let snapshotter = MKMapSnapshotter(options: options)
+        do {
+            let snapshot = try await snapshotter.start()
+            return snapshot.image.jpegData(compressionQuality: 0.75)
+        } catch {
+            // Snapshot unavailable (e.g. no map tiles cached) — not a hard failure
+            return nil
+        }
     }
 
     // MARK: - Difficulty Weighting

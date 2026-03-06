@@ -130,6 +130,14 @@ final class QuestService {
         )
     }
 
+    func updateImageURL(questId: String, imageURL: String) async throws {
+        try await firestoreService.updateFields(
+            collection: AppConstants.Collections.quests,
+            documentId: questId,
+            fields: ["imageURL": imageURL]
+        )
+    }
+
     func deactivateQuest(questId: String) async throws {
         try await firestoreService.updateFields(
             collection: AppConstants.Collections.quests,
