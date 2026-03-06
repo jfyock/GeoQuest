@@ -28,41 +28,39 @@ struct GQButtonSmall: View {
     var color: Color = GQTheme.primary
     let action: () -> Void
 
-    @State private var isPressed = false
-
     var body: some View {
         Button(action: action) {
-            ZStack {
-                // Try texture background
+            HStack(spacing: 6) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 14, weight: .bold))
+                }
+                Text(title)
+                    .font(.system(.caption, design: .rounded, weight: .bold))
+            }
+            .foregroundStyle(.white)
+            .shadow(color: .black.opacity(0.3), radius: 1, x: 0, y: 1)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            .background {
                 if let imgName = resolvedImage, UIImage(named: imgName) != nil {
                     Image(imgName)
                         .resizable()
                         .scaledToFill()
                 } else {
-                    Capsule().fill(color)
-                    Capsule().fill(
-                        LinearGradient(
-                            colors: [.white.opacity(0.25), .clear],
-                            startPoint: .top,
-                            endPoint: .center
+                    ZStack {
+                        Capsule().fill(color)
+                        Capsule().fill(
+                            LinearGradient(
+                                colors: [.white.opacity(0.25), .clear],
+                                startPoint: .top,
+                                endPoint: .center
+                            )
                         )
-                    )
-                }
-
-                HStack(spacing: 6) {
-                    if let icon {
-                        Image(systemName: icon)
-                            .font(.system(size: 14, weight: .bold))
                     }
-                    Text(title)
-                        .font(.system(.caption, design: .rounded, weight: .bold))
                 }
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.3), radius: 1, x: 0, y: 1)
             }
             .clipShape(Capsule())
-            .padding(.horizontal, 18)
-            .padding(.vertical, 10)
             .shadow(color: color.opacity(0.35), radius: 6, x: 0, y: 3)
         }
         .buttonStyle(BouncyButtonStyle())

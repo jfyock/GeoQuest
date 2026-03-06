@@ -264,14 +264,12 @@ struct Avatar3DMapView: UIViewRepresentable {
             }
         }
 
-        // Update camera orbit when map pitch changes
-        if abs(coord.currentCameraPitch - cameraPitch) > 1 {
+        // Update camera orbit immediately when map pitch changes — no threshold
+        // or animation delay so the avatar perspective stays in sync with the map.
+        if coord.currentCameraPitch != cameraPitch {
             coord.currentCameraPitch = cameraPitch
             if let cameraNode = scene.rootNode.childNode(withName: Self.cameraNodeName, recursively: false) {
-                SCNTransaction.begin()
-                SCNTransaction.animationDuration = 0.3
                 updateCameraForPitch(cameraNode: cameraNode, pitch: cameraPitch)
-                SCNTransaction.commit()
             }
         }
 

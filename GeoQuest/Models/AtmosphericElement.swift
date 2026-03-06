@@ -1,7 +1,7 @@
 import CoreLocation
 
 /// A world-anchored atmospheric element placed at a real map coordinate.
-/// These elements are rendered as map annotations and move with the map.
+/// These elements are rendered as 3D map annotations and move with the map.
 struct AtmosphericElement: Identifiable {
     let id: String
     let kind: Kind
@@ -13,7 +13,6 @@ struct AtmosphericElement: Identifiable {
         case bird
         case boat
         case cloud
-        case leaf
         case plane
         case hotAirBalloon
         case butterfly

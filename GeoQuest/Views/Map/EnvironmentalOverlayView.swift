@@ -1,487 +1,665 @@
+import SceneKit
 import SwiftUI
 
-// MARK: - Map Annotation View for Atmospheric Elements
+// MARK: - Map Annotation View for 3D Atmospheric Elements
 
-/// Renders a single atmospheric element as a map annotation view.
-/// Each element is geo-anchored so it pans and rotates with the map.
+/// Renders a single atmospheric element as a 3D SceneKit annotation view.
+/// Each element is geo-anchored so it pans and rotates with the map,
+/// and uses the same camera-orbit perspective as the player avatar.
 struct AtmosphericAnnotationView: View {
     let element: AtmosphericElement
+    var cameraPitch: Double = 0
+    var zoomScale: CGFloat = 1.0
 
     var body: some View {
-        Group {
-            switch element.kind {
-            case .bird:
-                BirdAnnotationView(heading: element.heading)
-            case .boat:
-                BoatAnnotationView(heading: element.heading)
-            case .cloud:
-                CloudAnnotationView()
-            case .leaf:
-                LeafAnnotationView()
-            case .plane:
-                PlaneAnnotationView(heading: element.heading)
-            case .hotAirBalloon:
-                HotAirBalloonAnnotationView()
-            case .butterfly:
-                ButterflyAnnotationView()
-            }
-        }
+        MapElement3DView(
+            type: elementType,
+            cameraPitch: cameraPitch
+        )
+        .frame(width: frameSize.width, height: frameSize.height)
+        .scaleEffect(zoomScale)
         .allowsHitTesting(false)
     }
-}
 
-// MARK: - Bird (flapping wings)
-
-private struct BirdAnnotationView: View {
-    let heading: Double
-    @State private var wingAngle: Double = -15
-    @State private var appeared = false
-
-    var body: some View {
-        Canvas { ctx, size in
-            let cx = size.width / 2
-            let cy = size.height / 2
-            let flapOffset = wingAngle
-
-            // Draw a flock of 2–3 birds in a V
-            for i in 0..<3 {
-                let offsetX = Double(i - 1) * 14.0
-                let offsetY = abs(Double(i - 1)) * 6.0
-                drawFlappingBird(
-                    context: ctx,
-                    x: cx + offsetX,
-                    y: cy + offsetY,
-                    wingFlap: flapOffset + Double(i) * 5
-                )
-            }
-        }
-        .frame(width: 60, height: 36)
-        .rotationEffect(.degrees(heading))
-        .opacity(appeared ? 0.7 : 0)
-        .onAppear {
-            withAnimation(.easeIn(duration: 0.5)) { appeared = true }
-            withAnimation(.easeInOut(duration: 0.35).repeatForever(autoreverses: true)) {
-                wingAngle = 20
-            }
+    private var elementType: MapElement3DView.ElementType {
+        switch element.kind {
+        case .bird: return .bird(heading: element.heading)
+        case .boat: return .boat(heading: element.heading)
+        case .cloud: return .cloud
+        case .plane: return .plane(heading: element.heading)
+        case .hotAirBalloon: return .hotAirBalloon
+        case .butterfly: return .butterfly
         }
     }
 
-    private func drawFlappingBird(context: GraphicsContext, x: Double, y: Double, wingFlap: Double) {
-        // Body dot
-        let bodyRect = CGRect(x: x - 2, y: y - 1.5, width: 4, height: 3)
-        context.fill(Path(ellipseIn: bodyRect), with: .color(.black.opacity(0.55)))
-
-        // Left wing
-        var leftWing = Path()
-        leftWing.move(to: CGPoint(x: x - 2, y: y))
-        leftWing.addQuadCurve(
-            to: CGPoint(x: x - 12, y: y - 1),
-            control: CGPoint(x: x - 7, y: y + wingFlap * 0.4 - 6)
-        )
-        context.stroke(leftWing, with: .color(.black.opacity(0.55)), lineWidth: 1.8)
-
-        // Right wing
-        var rightWing = Path()
-        rightWing.move(to: CGPoint(x: x + 2, y: y))
-        rightWing.addQuadCurve(
-            to: CGPoint(x: x + 12, y: y - 1),
-            control: CGPoint(x: x + 7, y: y + wingFlap * 0.4 - 6)
-        )
-        context.stroke(rightWing, with: .color(.black.opacity(0.55)), lineWidth: 1.8)
-    }
-}
-
-// MARK: - Boat (hull + sail + bobbing wake)
-
-private struct BoatAnnotationView: View {
-    let heading: Double
-    @State private var bobOffset: CGFloat = 0
-    @State private var sailBillow: CGFloat = 0
-    @State private var appeared = false
-
-    var body: some View {
-        ZStack {
-            // Wake lines behind the boat
-            VStack(spacing: 2) {
-                ForEach(0..<3, id: \.self) { i in
-                    Capsule()
-                        .fill(Color.white.opacity(0.3 - Double(i) * 0.08))
-                        .frame(width: CGFloat(20 + i * 8), height: 1.5)
-                }
-            }
-            .offset(y: 16)
-
-            // Hull — rounded boat shape
-            Canvas { ctx, size in
-                let w = size.width
-                let h = size.height
-                var hull = Path()
-                hull.move(to: CGPoint(x: w * 0.1, y: h * 0.55))
-                hull.addQuadCurve(to: CGPoint(x: w * 0.9, y: h * 0.55), control: CGPoint(x: w * 0.5, y: h * 0.85))
-                hull.addLine(to: CGPoint(x: w * 0.8, y: h * 0.45))
-                hull.addLine(to: CGPoint(x: w * 0.2, y: h * 0.45))
-                hull.closeSubpath()
-                ctx.fill(hull, with: .color(Color(red: 0.55, green: 0.35, blue: 0.2)))
-
-                // Mast
-                var mast = Path()
-                mast.move(to: CGPoint(x: w * 0.45, y: h * 0.45))
-                mast.addLine(to: CGPoint(x: w * 0.45, y: h * 0.08))
-                ctx.stroke(mast, with: .color(Color(red: 0.45, green: 0.3, blue: 0.15)), lineWidth: 2)
-
-                // Sail — triangular with a slight curve for billow
-                var sail = Path()
-                sail.move(to: CGPoint(x: w * 0.47, y: h * 0.1))
-                sail.addQuadCurve(
-                    to: CGPoint(x: w * 0.47, y: h * 0.42),
-                    control: CGPoint(x: w * (0.75 + Double(sailBillow) * 0.05), y: h * 0.25)
-                )
-                sail.addLine(to: CGPoint(x: w * 0.47, y: h * 0.1))
-                ctx.fill(sail, with: .color(.white.opacity(0.85)))
-                ctx.stroke(sail, with: .color(.gray.opacity(0.3)), lineWidth: 0.5)
-            }
-            .frame(width: 44, height: 40)
-            .offset(y: bobOffset)
-        }
-        .frame(width: 50, height: 50)
-        .rotationEffect(.degrees(heading))
-        .opacity(appeared ? 0.9 : 0)
-        .onAppear {
-            withAnimation(.easeIn(duration: 0.8)) { appeared = true }
-            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
-                bobOffset = 3
-            }
-            withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true)) {
-                sailBillow = 1
-            }
+    private var frameSize: CGSize {
+        switch element.kind {
+        case .bird: return CGSize(width: 50, height: 40)
+        case .boat: return CGSize(width: 55, height: 50)
+        case .cloud: return CGSize(width: 70, height: 45)
+        case .plane: return CGSize(width: 48, height: 52)
+        case .hotAirBalloon: return CGSize(width: 42, height: 56)
+        case .butterfly: return CGSize(width: 28, height: 24)
         }
     }
 }
 
-// MARK: - Cloud (soft, drifting)
+// MARK: - Generic 3D Map Element (SceneKit)
 
-private struct CloudAnnotationView: View {
-    @State private var appeared = false
-    @State private var driftX: CGFloat = 0
-
-    var body: some View {
-        CloudShape()
-            .fill(Color.white.opacity(0.35))
-            .frame(width: CGFloat.random(in: 80...140), height: CGFloat.random(in: 35...55))
-            .blur(radius: 3)
-            .offset(x: driftX)
-            .opacity(appeared ? 1 : 0)
-            .onAppear {
-                withAnimation(.easeIn(duration: 2)) { appeared = true }
-                withAnimation(.linear(duration: 60).repeatForever(autoreverses: true)) {
-                    driftX = CGFloat.random(in: 15...30)
-                }
-            }
+/// A lightweight SceneKit view that renders a 3D element with camera orbit
+/// matching the map's camera pitch. Shared by all environmental elements
+/// and quest markers.
+struct MapElement3DView: UIViewRepresentable {
+    enum ElementType: Equatable {
+        case bird(heading: Double)
+        case boat(heading: Double)
+        case cloud
+        case plane(heading: Double)
+        case hotAirBalloon
+        case butterfly
+        case questMarker(red: CGFloat, green: CGFloat, blue: CGFloat, isCompleted: Bool)
     }
-}
 
-private struct CloudShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let w = rect.width
-        let h = rect.height
-        path.addEllipse(in: CGRect(x: w * 0.05, y: h * 0.30, width: w * 0.40, height: h * 0.70))
-        path.addEllipse(in: CGRect(x: w * 0.25, y: h * 0.05, width: w * 0.50, height: h * 0.70))
-        path.addEllipse(in: CGRect(x: w * 0.50, y: h * 0.20, width: w * 0.42, height: h * 0.65))
-        path.addEllipse(in: CGRect(x: w * 0.70, y: h * 0.35, width: w * 0.28, height: h * 0.50))
-        return path
+    let type: ElementType
+    var cameraPitch: Double = 0
+
+    private static let cameraNodeName = "elemCam"
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
     }
-}
 
-// MARK: - Leaf (detailed shape with veins, tumbling)
+    func makeUIView(context: Context) -> SCNView {
+        let scnView = SCNView()
+        scnView.backgroundColor = .clear
+        scnView.preferredFramesPerSecond = 15
+        scnView.contentScaleFactor = UIScreen.main.scale
+        scnView.antialiasingMode = .none
+        scnView.allowsCameraControl = false
+        scnView.autoenablesDefaultLighting = false
 
-private struct LeafAnnotationView: View {
-    @State private var rotation: Double = Double.random(in: 0...360)
-    @State private var swayX: CGFloat = 0
-    @State private var swayY: CGFloat = 0
-    @State private var appeared = false
+        let scene = SCNScene()
+        scene.background.contents = UIColor.clear
 
-    private let leafColor: Color = {
-        let colors: [Color] = [
-            Color(red: 0.2, green: 0.7, blue: 0.3, opacity: 0.75),
-            Color(red: 0.85, green: 0.7, blue: 0.1, opacity: 0.7),
-            Color(red: 0.8, green: 0.4, blue: 0.1, opacity: 0.7),
-            Color(red: 0.75, green: 0.15, blue: 0.15, opacity: 0.65),
-            Color(red: 0.6, green: 0.5, blue: 0.05, opacity: 0.7),
-        ]
-        return colors.randomElement()!
-    }()
+        let rootNode = ElementSceneBuilder.build(type: type)
+        rootNode.name = "elementRoot"
+        scene.rootNode.addChildNode(rootNode)
 
-    var body: some View {
-        Canvas { ctx, size in
-            let w = size.width
-            let h = size.height
+        // Camera with orthographic projection
+        let cameraNode = SCNNode()
+        cameraNode.name = Self.cameraNodeName
+        let camera = SCNCamera()
+        camera.usesOrthographicProjection = true
+        camera.orthographicScale = orthoScale
+        cameraNode.camera = camera
+        scene.rootNode.addChildNode(cameraNode)
+        Self.updateCameraForPitch(cameraNode: cameraNode, pitch: cameraPitch)
 
-            // Leaf body — pointed oval
-            var leaf = Path()
-            leaf.move(to: CGPoint(x: w * 0.5, y: 0))
-            leaf.addQuadCurve(to: CGPoint(x: w, y: h * 0.5), control: CGPoint(x: w * 0.95, y: h * 0.05))
-            leaf.addQuadCurve(to: CGPoint(x: w * 0.5, y: h), control: CGPoint(x: w * 0.95, y: h * 0.95))
-            leaf.addQuadCurve(to: CGPoint(x: 0, y: h * 0.5), control: CGPoint(x: w * 0.05, y: h * 0.95))
-            leaf.addQuadCurve(to: CGPoint(x: w * 0.5, y: 0), control: CGPoint(x: w * 0.05, y: h * 0.05))
-            ctx.fill(leaf, with: .color(leafColor))
+        // Simple lighting
+        let keyLight = SCNNode()
+        keyLight.light = SCNLight()
+        keyLight.light?.type = .directional
+        keyLight.light?.intensity = 800
+        keyLight.eulerAngles = SCNVector3(-Float.pi / 3, Float.pi / 6, 0)
+        scene.rootNode.addChildNode(keyLight)
 
-            // Center vein
-            var vein = Path()
-            vein.move(to: CGPoint(x: w * 0.5, y: h * 0.05))
-            vein.addLine(to: CGPoint(x: w * 0.5, y: h * 0.95))
-            ctx.stroke(vein, with: .color(leafColor.opacity(0.5)), lineWidth: 0.8)
+        let ambient = SCNNode()
+        ambient.light = SCNLight()
+        ambient.light?.type = .ambient
+        ambient.light?.intensity = 400
+        scene.rootNode.addChildNode(ambient)
 
-            // Side veins
-            for i in 1...3 {
-                let t = CGFloat(i) / 4.0
-                let cy = h * t
+        scnView.scene = scene
 
-                var leftVein = Path()
-                leftVein.move(to: CGPoint(x: w * 0.5, y: cy))
-                leftVein.addLine(to: CGPoint(x: w * 0.15, y: cy - h * 0.08))
-                ctx.stroke(leftVein, with: .color(leafColor.opacity(0.35)), lineWidth: 0.5)
+        // Start element-specific animations
+        ElementSceneBuilder.animate(rootNode: rootNode, type: type)
 
-                var rightVein = Path()
-                rightVein.move(to: CGPoint(x: w * 0.5, y: cy))
-                rightVein.addLine(to: CGPoint(x: w * 0.85, y: cy - h * 0.08))
-                ctx.stroke(rightVein, with: .color(leafColor.opacity(0.35)), lineWidth: 0.5)
-            }
-        }
-        .frame(width: 18, height: 14)
-        .rotationEffect(.degrees(rotation))
-        .offset(x: swayX, y: swayY)
-        .opacity(appeared ? 0.85 : 0)
-        .onAppear {
-            withAnimation(.easeIn(duration: 0.3)) { appeared = true }
-            withAnimation(.linear(duration: Double.random(in: 4...8)).repeatForever(autoreverses: false)) {
-                rotation += 360
-            }
-            withAnimation(.easeInOut(duration: Double.random(in: 1.5...3)).repeatForever(autoreverses: true)) {
-                swayX = CGFloat.random(in: -8...8)
-                swayY = CGFloat.random(in: -5...5)
-            }
+        context.coordinator.currentPitch = cameraPitch
+        return scnView
+    }
+
+    func updateUIView(_ scnView: SCNView, context: Context) {
+        guard let scene = scnView.scene,
+              let cameraNode = scene.rootNode.childNode(
+                  withName: Self.cameraNodeName, recursively: false
+              ) else { return }
+
+        // Update camera orbit immediately — no animation for real-time sync
+        if context.coordinator.currentPitch != cameraPitch {
+            context.coordinator.currentPitch = cameraPitch
+            Self.updateCameraForPitch(cameraNode: cameraNode, pitch: cameraPitch)
         }
     }
-}
 
-// MARK: - Plane (takes off from airports, detailed silhouette)
+    final class Coordinator {
+        var currentPitch: Double = 0
+    }
 
-private struct PlaneAnnotationView: View {
-    let heading: Double
-    @State private var appeared = false
-    @State private var altitude: CGFloat = 0
+    // MARK: - Camera Orbit (same logic as Avatar3DMapView)
 
-    var body: some View {
-        Canvas { ctx, size in
-            let w = size.width
-            let h = size.height
+    private static func updateCameraForPitch(cameraNode: SCNNode, pitch: Double) {
+        let clampedPitch = min(max(pitch, 0), 70)
+        let t = clampedPitch / 70.0
+        let orbitRadius: Float = 3.0
+        let elevationDeg = 80.0 - t * 70.0
+        let elevationRad = Float(elevationDeg * .pi / 180)
+        let camY = Float(0.3) + orbitRadius * sin(elevationRad)
+        let camZ = orbitRadius * cos(elevationRad)
+        cameraNode.position = SCNVector3(0, camY, camZ)
+        cameraNode.look(at: SCNVector3(0, 0.2, 0))
+    }
 
-            // Fuselage
-            var fuselage = Path()
-            fuselage.move(to: CGPoint(x: w * 0.5, y: h * 0.05))
-            fuselage.addQuadCurve(to: CGPoint(x: w * 0.55, y: h * 0.85), control: CGPoint(x: w * 0.56, y: h * 0.4))
-            fuselage.addLine(to: CGPoint(x: w * 0.5, y: h * 0.95))
-            fuselage.addLine(to: CGPoint(x: w * 0.45, y: h * 0.85))
-            fuselage.addQuadCurve(to: CGPoint(x: w * 0.5, y: h * 0.05), control: CGPoint(x: w * 0.44, y: h * 0.4))
-            ctx.fill(fuselage, with: .color(.white.opacity(0.9)))
-            ctx.stroke(fuselage, with: .color(.gray.opacity(0.3)), lineWidth: 0.5)
-
-            // Main wings
-            var leftWing = Path()
-            leftWing.move(to: CGPoint(x: w * 0.48, y: h * 0.38))
-            leftWing.addLine(to: CGPoint(x: w * 0.05, y: h * 0.45))
-            leftWing.addLine(to: CGPoint(x: w * 0.05, y: h * 0.48))
-            leftWing.addLine(to: CGPoint(x: w * 0.48, y: h * 0.44))
-            leftWing.closeSubpath()
-            ctx.fill(leftWing, with: .color(.white.opacity(0.85)))
-            ctx.stroke(leftWing, with: .color(.gray.opacity(0.3)), lineWidth: 0.5)
-
-            var rightWing = Path()
-            rightWing.move(to: CGPoint(x: w * 0.52, y: h * 0.38))
-            rightWing.addLine(to: CGPoint(x: w * 0.95, y: h * 0.45))
-            rightWing.addLine(to: CGPoint(x: w * 0.95, y: h * 0.48))
-            rightWing.addLine(to: CGPoint(x: w * 0.52, y: h * 0.44))
-            rightWing.closeSubpath()
-            ctx.fill(rightWing, with: .color(.white.opacity(0.85)))
-            ctx.stroke(rightWing, with: .color(.gray.opacity(0.3)), lineWidth: 0.5)
-
-            // Tail fin
-            var tail = Path()
-            tail.move(to: CGPoint(x: w * 0.48, y: h * 0.78))
-            tail.addLine(to: CGPoint(x: w * 0.3, y: h * 0.85))
-            tail.addLine(to: CGPoint(x: w * 0.3, y: h * 0.87))
-            tail.addLine(to: CGPoint(x: w * 0.48, y: h * 0.82))
-            tail.closeSubpath()
-            ctx.fill(tail, with: .color(.white.opacity(0.8)))
-
-            var tailR = Path()
-            tailR.move(to: CGPoint(x: w * 0.52, y: h * 0.78))
-            tailR.addLine(to: CGPoint(x: w * 0.7, y: h * 0.85))
-            tailR.addLine(to: CGPoint(x: w * 0.7, y: h * 0.87))
-            tailR.addLine(to: CGPoint(x: w * 0.52, y: h * 0.82))
-            tailR.closeSubpath()
-            ctx.fill(tailR, with: .color(.white.opacity(0.8)))
-
-            // Engine pods
-            for xMul in [0.3, 0.7] {
-                let ex = w * xMul
-                let ey = h * 0.42
-                let engineRect = CGRect(x: ex - 3, y: ey - 2, width: 6, height: 8)
-                ctx.fill(Path(roundedRect: engineRect, cornerRadius: 2), with: .color(.gray.opacity(0.5)))
-            }
-        }
-        .frame(width: 40, height: 48)
-        .shadow(color: .black.opacity(0.15), radius: 6 + altitude * 0.5, x: 2 + altitude * 0.3, y: 4 + altitude * 0.5)
-        .rotationEffect(.degrees(heading))
-        .opacity(appeared ? 0.85 : 0)
-        .onAppear {
-            withAnimation(.easeIn(duration: 1.0)) { appeared = true }
-            withAnimation(.easeInOut(duration: 8).repeatForever(autoreverses: true)) {
-                altitude = 6
-            }
+    private var orthoScale: Double {
+        switch type {
+        case .cloud: return 1.4
+        case .hotAirBalloon: return 1.0
+        case .boat: return 1.1
+        case .questMarker: return 1.0
+        default: return 0.9
         }
     }
 }
 
-// MARK: - Hot Air Balloon
+// MARK: - Element Scene Builder
 
-private struct HotAirBalloonAnnotationView: View {
-    @State private var appeared = false
-    @State private var bobY: CGFloat = 0
+/// Builds procedural 3D SceneKit geometry for each atmospheric element type.
+enum ElementSceneBuilder {
 
-    private let balloonColor: Color = {
-        let colors: [Color] = [.red, .orange, .blue, .purple, .green, .yellow]
-        return colors.randomElement()!
-    }()
-
-    var body: some View {
-        Canvas { ctx, size in
-            let w = size.width
-            let h = size.height
-
-            // Balloon envelope
-            var envelope = Path()
-            envelope.addEllipse(in: CGRect(x: w * 0.15, y: 0, width: w * 0.7, height: h * 0.65))
-            ctx.fill(envelope, with: .color(balloonColor.opacity(0.75)))
-
-            // Stripes on envelope
-            for i in 0..<3 {
-                let stripX = w * (0.25 + Double(i) * 0.15)
-                var stripe = Path()
-                stripe.move(to: CGPoint(x: stripX, y: h * 0.05))
-                stripe.addQuadCurve(
-                    to: CGPoint(x: stripX + w * 0.02, y: h * 0.6),
-                    control: CGPoint(x: stripX + w * 0.08, y: h * 0.3)
-                )
-                ctx.stroke(stripe, with: .color(.white.opacity(0.4)), lineWidth: 2)
-            }
-
-            // Basket ropes
-            for xMul in [0.35, 0.65] {
-                var rope = Path()
-                rope.move(to: CGPoint(x: w * xMul, y: h * 0.6))
-                rope.addLine(to: CGPoint(x: w * (xMul < 0.5 ? 0.4 : 0.6), y: h * 0.78))
-                ctx.stroke(rope, with: .color(.brown.opacity(0.5)), lineWidth: 0.8)
-            }
-
-            // Basket
-            let basketRect = CGRect(x: w * 0.35, y: h * 0.78, width: w * 0.3, height: h * 0.15)
-            ctx.fill(Path(roundedRect: basketRect, cornerRadius: 2), with: .color(Color(red: 0.55, green: 0.35, blue: 0.15)))
-        }
-        .frame(width: 36, height: 48)
-        .offset(y: bobY)
-        .opacity(appeared ? 0.8 : 0)
-        .onAppear {
-            withAnimation(.easeIn(duration: 1.0)) { appeared = true }
-            withAnimation(.easeInOut(duration: 4.0).repeatForever(autoreverses: true)) {
-                bobY = -5
-            }
+    static func build(type: MapElement3DView.ElementType) -> SCNNode {
+        switch type {
+        case .bird(let heading): return buildBird(heading: heading)
+        case .boat(let heading): return buildBoat(heading: heading)
+        case .cloud: return buildCloud()
+        case .plane(let heading): return buildPlane(heading: heading)
+        case .hotAirBalloon: return buildBalloon()
+        case .butterfly: return buildButterfly()
+        case .questMarker(let r, let g, let b, let isCompleted):
+            return buildQuestMarker(red: r, green: g, blue: b, isCompleted: isCompleted)
         }
     }
-}
 
-// MARK: - Butterfly (fluttering wings)
+    static func animate(rootNode: SCNNode, type: MapElement3DView.ElementType) {
+        switch type {
+        case .bird: animateBird(rootNode)
+        case .boat: animateBoat(rootNode)
+        case .cloud: animateCloud(rootNode)
+        case .plane: animatePlane(rootNode)
+        case .hotAirBalloon: animateBalloon(rootNode)
+        case .butterfly: animateButterfly(rootNode)
+        case .questMarker: animateQuestMarker(rootNode)
+        }
+    }
 
-private struct ButterflyAnnotationView: View {
-    @State private var wingSpread: Double = 0
-    @State private var flutterX: CGFloat = 0
-    @State private var flutterY: CGFloat = 0
-    @State private var appeared = false
+    // MARK: - Bird (3D body + flapping wings in V-formation)
 
-    private let wingColor: Color = {
-        let colors: [Color] = [
-            Color(red: 1.0, green: 0.5, blue: 0.2), // Monarch
-            Color(red: 0.3, green: 0.5, blue: 1.0), // Blue morpho
-            Color(red: 1.0, green: 1.0, blue: 0.3), // Swallowtail
-            Color(red: 0.9, green: 0.2, blue: 0.5), // Pink
-        ]
-        return colors.randomElement()!
-    }()
+    private static func buildBird(heading: Double) -> SCNNode {
+        let root = SCNNode()
+        root.eulerAngles.y = Float(heading * .pi / 180)
 
-    var body: some View {
-        Canvas { ctx, size in
-            let cx = size.width / 2
-            let cy = size.height / 2
-            let spread = 0.6 + wingSpread * 0.4
-
-            // Left wings
-            var leftUpper = Path()
-            leftUpper.addEllipse(in: CGRect(
-                x: cx - 10 * spread, y: cy - 7,
-                width: 9 * spread, height: 8
-            ))
-            ctx.fill(leftUpper, with: .color(wingColor.opacity(0.8)))
-
-            var leftLower = Path()
-            leftLower.addEllipse(in: CGRect(
-                x: cx - 8 * spread, y: cy - 1,
-                width: 7 * spread, height: 6
-            ))
-            ctx.fill(leftLower, with: .color(wingColor.opacity(0.65)))
-
-            // Right wings
-            var rightUpper = Path()
-            rightUpper.addEllipse(in: CGRect(
-                x: cx + 1, y: cy - 7,
-                width: 9 * spread, height: 8
-            ))
-            ctx.fill(rightUpper, with: .color(wingColor.opacity(0.8)))
-
-            var rightLower = Path()
-            rightLower.addEllipse(in: CGRect(
-                x: cx + 1, y: cy - 1,
-                width: 7 * spread, height: 6
-            ))
-            ctx.fill(rightLower, with: .color(wingColor.opacity(0.65)))
+        for i in 0..<3 {
+            let bird = SCNNode()
+            let offsetX = Float(i - 1) * 0.25
+            let offsetZ = abs(Float(i - 1)) * 0.1
+            bird.position = SCNVector3(offsetX, 0, offsetZ)
 
             // Body
-            let bodyRect = CGRect(x: cx - 1, y: cy - 5, width: 2, height: 10)
-            ctx.fill(Path(ellipseIn: bodyRect), with: .color(.black.opacity(0.6)))
+            let bodyGeo = SCNSphere(radius: 0.06)
+            bodyGeo.firstMaterial?.diffuse.contents = UIColor(white: 0.15, alpha: 1)
+            bodyGeo.firstMaterial?.lightingModel = .phong
+            let body = SCNNode(geometry: bodyGeo)
+            body.scale = SCNVector3(0.8, 0.6, 1.4)
+            bird.addChildNode(body)
 
-            // Antennae
-            var antenna1 = Path()
-            antenna1.move(to: CGPoint(x: cx - 1, y: cy - 5))
-            antenna1.addLine(to: CGPoint(x: cx - 4, y: cy - 9))
-            ctx.stroke(antenna1, with: .color(.black.opacity(0.4)), lineWidth: 0.5)
+            // Wings
+            let wingGeo = SCNBox(width: 0.22, height: 0.015, length: 0.1, chamferRadius: 0.005)
+            wingGeo.firstMaterial?.diffuse.contents = UIColor(white: 0.2, alpha: 1)
+            wingGeo.firstMaterial?.lightingModel = .phong
 
-            var antenna2 = Path()
-            antenna2.move(to: CGPoint(x: cx + 1, y: cy - 5))
-            antenna2.addLine(to: CGPoint(x: cx + 4, y: cy - 9))
-            ctx.stroke(antenna2, with: .color(.black.opacity(0.4)), lineWidth: 0.5)
+            let leftWing = SCNNode(geometry: wingGeo)
+            leftWing.name = "leftWing_\(i)"
+            leftWing.position = SCNVector3(-0.08, 0.015, 0)
+            leftWing.pivot = SCNMatrix4MakeTranslation(0.08, 0, 0)
+            bird.addChildNode(leftWing)
+
+            let rightWingGeo = wingGeo.copy() as! SCNBox
+            let rightWing = SCNNode(geometry: rightWingGeo)
+            rightWing.name = "rightWing_\(i)"
+            rightWing.position = SCNVector3(0.08, 0.015, 0)
+            rightWing.pivot = SCNMatrix4MakeTranslation(-0.08, 0, 0)
+            bird.addChildNode(rightWing)
+
+            // Tail
+            let tailGeo = SCNBox(width: 0.04, height: 0.01, length: 0.08, chamferRadius: 0.003)
+            tailGeo.firstMaterial?.diffuse.contents = UIColor(white: 0.18, alpha: 1)
+            let tail = SCNNode(geometry: tailGeo)
+            tail.position = SCNVector3(0, 0, -0.1)
+            bird.addChildNode(tail)
+
+            root.addChildNode(bird)
         }
-        .frame(width: 24, height: 20)
-        .offset(x: flutterX, y: flutterY)
-        .opacity(appeared ? 0.85 : 0)
-        .onAppear {
-            withAnimation(.easeIn(duration: 0.3)) { appeared = true }
-            withAnimation(.easeInOut(duration: 0.2).repeatForever(autoreverses: true)) {
-                wingSpread = 1
+
+        return root
+    }
+
+    private static func animateBird(_ root: SCNNode) {
+        for i in 0..<3 {
+            let phase = Double(i) * 0.15
+            if let left = root.childNode(withName: "leftWing_\(i)", recursively: true) {
+                let flap = SCNAction.repeatForever(SCNAction.sequence([
+                    SCNAction.wait(duration: phase),
+                    SCNAction.rotateBy(x: 0, y: 0, z: CGFloat.pi * 0.35, duration: 0.2),
+                    SCNAction.rotateBy(x: 0, y: 0, z: -CGFloat.pi * 0.35, duration: 0.25),
+                ]))
+                left.runAction(flap)
             }
-            withAnimation(.easeInOut(duration: Double.random(in: 1.5...3)).repeatForever(autoreverses: true)) {
-                flutterX = CGFloat.random(in: -10...10)
-                flutterY = CGFloat.random(in: -6...6)
+            if let right = root.childNode(withName: "rightWing_\(i)", recursively: true) {
+                let flap = SCNAction.repeatForever(SCNAction.sequence([
+                    SCNAction.wait(duration: phase),
+                    SCNAction.rotateBy(x: 0, y: 0, z: -CGFloat.pi * 0.35, duration: 0.2),
+                    SCNAction.rotateBy(x: 0, y: 0, z: CGFloat.pi * 0.35, duration: 0.25),
+                ]))
+                right.runAction(flap)
             }
+        }
+    }
+
+    // MARK: - Boat (3D hull + mast + sail + bobbing)
+
+    private static func buildBoat(heading: Double) -> SCNNode {
+        let root = SCNNode()
+        root.eulerAngles.y = Float(heading * .pi / 180)
+
+        // Hull
+        let hullGeo = SCNBox(width: 0.5, height: 0.1, length: 0.18, chamferRadius: 0.05)
+        hullGeo.firstMaterial?.diffuse.contents = UIColor(red: 0.55, green: 0.35, blue: 0.2, alpha: 1)
+        hullGeo.firstMaterial?.lightingModel = .phong
+        hullGeo.firstMaterial?.specular.contents = UIColor.white.withAlphaComponent(0.2)
+        let hull = SCNNode(geometry: hullGeo)
+        hull.name = "hull"
+        root.addChildNode(hull)
+
+        // Mast
+        let mastGeo = SCNCylinder(radius: 0.012, height: 0.4)
+        mastGeo.firstMaterial?.diffuse.contents = UIColor(red: 0.45, green: 0.3, blue: 0.15, alpha: 1)
+        let mast = SCNNode(geometry: mastGeo)
+        mast.position = SCNVector3(0, 0.25, 0)
+        root.addChildNode(mast)
+
+        // Sail
+        let sailGeo = SCNBox(width: 0.18, height: 0.28, length: 0.01, chamferRadius: 0.005)
+        sailGeo.firstMaterial?.diffuse.contents = UIColor.white.withAlphaComponent(0.92)
+        sailGeo.firstMaterial?.lightingModel = .phong
+        sailGeo.firstMaterial?.isDoubleSided = true
+        let sail = SCNNode(geometry: sailGeo)
+        sail.name = "sail"
+        sail.position = SCNVector3(0.06, 0.25, 0.02)
+        root.addChildNode(sail)
+
+        // Wake
+        let wakeGeo = SCNCylinder(radius: 0.12, height: 0.005)
+        wakeGeo.firstMaterial?.diffuse.contents = UIColor.white.withAlphaComponent(0.3)
+        let wake = SCNNode(geometry: wakeGeo)
+        wake.position = SCNVector3(-0.2, -0.04, 0)
+        wake.scale = SCNVector3(1.5, 1, 0.6)
+        root.addChildNode(wake)
+
+        return root
+    }
+
+    private static func animateBoat(_ root: SCNNode) {
+        let bob = SCNAction.repeatForever(SCNAction.sequence([
+            SCNAction.moveBy(x: 0, y: 0.04, z: 0, duration: 1.5),
+            SCNAction.moveBy(x: 0, y: -0.04, z: 0, duration: 1.5),
+        ]))
+        bob.timingMode = .easeInEaseOut
+        root.runAction(bob)
+
+        if let hull = root.childNode(withName: "hull", recursively: false) {
+            let roll = SCNAction.repeatForever(SCNAction.sequence([
+                SCNAction.rotateBy(x: 0, y: 0, z: 0.06, duration: 2.0),
+                SCNAction.rotateBy(x: 0, y: 0, z: -0.06, duration: 2.0),
+            ]))
+            roll.timingMode = .easeInEaseOut
+            hull.runAction(roll)
+        }
+    }
+
+    // MARK: - Cloud (cluster of overlapping spheres)
+
+    private static func buildCloud() -> SCNNode {
+        let root = SCNNode()
+        let cloudColor = UIColor.white.withAlphaComponent(0.7)
+        let positions: [(x: Float, y: Float, z: Float, r: CGFloat)] = [
+            (0, 0, 0, 0.2),
+            (-0.18, 0.03, 0.02, 0.16),
+            (0.2, 0.02, -0.01, 0.17),
+            (0.08, 0.08, 0.03, 0.14),
+            (-0.08, -0.02, -0.02, 0.13),
+        ]
+
+        for pos in positions {
+            let sphereGeo = SCNSphere(radius: pos.r)
+            sphereGeo.firstMaterial?.diffuse.contents = cloudColor
+            sphereGeo.firstMaterial?.lightingModel = .phong
+            sphereGeo.firstMaterial?.specular.contents = UIColor.white.withAlphaComponent(0.15)
+            let node = SCNNode(geometry: sphereGeo)
+            node.position = SCNVector3(pos.x, pos.y, pos.z)
+            root.addChildNode(node)
+        }
+
+        return root
+    }
+
+    private static func animateCloud(_ root: SCNNode) {
+        let drift = SCNAction.repeatForever(SCNAction.sequence([
+            SCNAction.moveBy(x: 0.03, y: 0.01, z: 0, duration: 4.0),
+            SCNAction.moveBy(x: -0.03, y: -0.01, z: 0, duration: 4.0),
+        ]))
+        drift.timingMode = .easeInEaseOut
+        root.runAction(drift)
+    }
+
+    // MARK: - Plane (fuselage + wings + tail, gains altitude)
+
+    private static func buildPlane(heading: Double) -> SCNNode {
+        let root = SCNNode()
+        root.eulerAngles.y = Float(heading * .pi / 180)
+
+        let bodyColor = UIColor.white.withAlphaComponent(0.95)
+        let metalColor = UIColor(white: 0.7, alpha: 1)
+
+        // Fuselage
+        let fuselageGeo = SCNCapsule(capRadius: 0.04, height: 0.45)
+        fuselageGeo.firstMaterial?.diffuse.contents = bodyColor
+        fuselageGeo.firstMaterial?.lightingModel = .phong
+        fuselageGeo.firstMaterial?.specular.contents = UIColor.white.withAlphaComponent(0.4)
+        let fuselage = SCNNode(geometry: fuselageGeo)
+        fuselage.eulerAngles.x = Float.pi / 2
+        root.addChildNode(fuselage)
+
+        // Wings
+        let wingGeo = SCNBox(width: 0.6, height: 0.01, length: 0.12, chamferRadius: 0.005)
+        wingGeo.firstMaterial?.diffuse.contents = bodyColor
+        wingGeo.firstMaterial?.lightingModel = .phong
+        let wings = SCNNode(geometry: wingGeo)
+        wings.position = SCNVector3(0, 0.01, 0.04)
+        root.addChildNode(wings)
+
+        // Tail horizontal stabilizer
+        let tailGeo = SCNBox(width: 0.2, height: 0.008, length: 0.06, chamferRadius: 0.003)
+        tailGeo.firstMaterial?.diffuse.contents = bodyColor
+        let tail = SCNNode(geometry: tailGeo)
+        tail.position = SCNVector3(0, 0.01, -0.2)
+        root.addChildNode(tail)
+
+        // Vertical fin
+        let finGeo = SCNBox(width: 0.008, height: 0.1, length: 0.08, chamferRadius: 0.003)
+        finGeo.firstMaterial?.diffuse.contents = bodyColor
+        let fin = SCNNode(geometry: finGeo)
+        fin.position = SCNVector3(0, 0.06, -0.2)
+        root.addChildNode(fin)
+
+        // Engine pods
+        for side: Float in [-1, 1] {
+            let engineGeo = SCNCylinder(radius: 0.025, height: 0.06)
+            engineGeo.firstMaterial?.diffuse.contents = metalColor
+            let engine = SCNNode(geometry: engineGeo)
+            engine.position = SCNVector3(side * 0.15, -0.01, 0.05)
+            engine.eulerAngles.x = Float.pi / 2
+            root.addChildNode(engine)
+        }
+
+        // Nose up — taking off
+        root.eulerAngles.x = -0.12
+
+        return root
+    }
+
+    private static func animatePlane(_ root: SCNNode) {
+        // Climb
+        let climb = SCNAction.repeatForever(SCNAction.sequence([
+            SCNAction.moveBy(x: 0, y: 0.08, z: 0, duration: 6.0),
+            SCNAction.moveBy(x: 0, y: -0.08, z: 0, duration: 6.0),
+        ]))
+        climb.timingMode = .easeInEaseOut
+        root.runAction(climb)
+
+        // Subtle bank
+        let bank = SCNAction.repeatForever(SCNAction.sequence([
+            SCNAction.rotateBy(x: 0, y: 0, z: 0.03, duration: 4.0),
+            SCNAction.rotateBy(x: 0, y: 0, z: -0.03, duration: 4.0),
+        ]))
+        bank.timingMode = .easeInEaseOut
+        root.runAction(bank)
+    }
+
+    // MARK: - Hot Air Balloon (envelope + basket + ropes)
+
+    private static func buildBalloon() -> SCNNode {
+        let root = SCNNode()
+
+        let balloonColors: [UIColor] = [
+            UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 1),
+            UIColor(red: 1.0, green: 0.6, blue: 0.1, alpha: 1),
+            UIColor(red: 0.2, green: 0.5, blue: 0.9, alpha: 1),
+            UIColor(red: 0.6, green: 0.2, blue: 0.8, alpha: 1),
+            UIColor(red: 0.2, green: 0.7, blue: 0.3, alpha: 1),
+        ]
+        let mainColor = balloonColors.randomElement()!
+
+        // Envelope
+        let envelopeGeo = SCNSphere(radius: 0.25)
+        envelopeGeo.firstMaterial?.diffuse.contents = mainColor
+        envelopeGeo.firstMaterial?.lightingModel = .phong
+        envelopeGeo.firstMaterial?.specular.contents = UIColor.white.withAlphaComponent(0.3)
+        let envelope = SCNNode(geometry: envelopeGeo)
+        envelope.position = SCNVector3(0, 0.35, 0)
+        envelope.scale = SCNVector3(1, 1.15, 1)
+        root.addChildNode(envelope)
+
+        // Stripes
+        for i in 0..<3 {
+            let stripeGeo = SCNCylinder(radius: 0.252, height: 0.02)
+            stripeGeo.firstMaterial?.diffuse.contents = UIColor.white.withAlphaComponent(0.4)
+            let stripe = SCNNode(geometry: stripeGeo)
+            stripe.position = SCNVector3(0, 0.35 + Float(i - 1) * 0.1, 0)
+            root.addChildNode(stripe)
+        }
+
+        // Ropes
+        for side: Float in [-1, 1] {
+            let ropeGeo = SCNCylinder(radius: 0.005, height: 0.18)
+            ropeGeo.firstMaterial?.diffuse.contents = UIColor.brown.withAlphaComponent(0.6)
+            let rope = SCNNode(geometry: ropeGeo)
+            rope.position = SCNVector3(side * 0.06, 0.08, 0)
+            root.addChildNode(rope)
+        }
+
+        // Basket
+        let basketGeo = SCNBox(width: 0.1, height: 0.06, length: 0.1, chamferRadius: 0.01)
+        basketGeo.firstMaterial?.diffuse.contents = UIColor(red: 0.55, green: 0.35, blue: 0.15, alpha: 1)
+        basketGeo.firstMaterial?.lightingModel = .phong
+        let basket = SCNNode(geometry: basketGeo)
+        basket.position = SCNVector3(0, -0.02, 0)
+        root.addChildNode(basket)
+
+        return root
+    }
+
+    private static func animateBalloon(_ root: SCNNode) {
+        let float = SCNAction.repeatForever(SCNAction.sequence([
+            SCNAction.moveBy(x: 0.02, y: 0.04, z: 0.01, duration: 3.0),
+            SCNAction.moveBy(x: -0.02, y: -0.04, z: -0.01, duration: 3.0),
+        ]))
+        float.timingMode = .easeInEaseOut
+        root.runAction(float)
+
+        let rotate = SCNAction.repeatForever(SCNAction.sequence([
+            SCNAction.rotateBy(x: 0, y: 0.1, z: 0, duration: 5.0),
+            SCNAction.rotateBy(x: 0, y: -0.1, z: 0, duration: 5.0),
+        ]))
+        rotate.timingMode = .easeInEaseOut
+        root.runAction(rotate)
+    }
+
+    // MARK: - Butterfly (tiny body + fluttering wings)
+
+    private static func buildButterfly() -> SCNNode {
+        let root = SCNNode()
+
+        let wingColors: [UIColor] = [
+            UIColor(red: 1.0, green: 0.5, blue: 0.2, alpha: 0.85),
+            UIColor(red: 0.3, green: 0.5, blue: 1.0, alpha: 0.85),
+            UIColor(red: 1.0, green: 0.9, blue: 0.3, alpha: 0.85),
+            UIColor(red: 0.9, green: 0.3, blue: 0.5, alpha: 0.85),
+        ]
+        let wingColor = wingColors.randomElement()!
+
+        // Body
+        let bodyGeo = SCNCylinder(radius: 0.008, height: 0.08)
+        bodyGeo.firstMaterial?.diffuse.contents = UIColor(white: 0.15, alpha: 1)
+        let body = SCNNode(geometry: bodyGeo)
+        body.eulerAngles.x = Float.pi / 2
+        root.addChildNode(body)
+
+        // Upper wings
+        for side: Float in [-1, 1] {
+            let wingGeo = SCNBox(width: 0.06, height: 0.05, length: 0.005, chamferRadius: 0.015)
+            wingGeo.firstMaterial?.diffuse.contents = wingColor
+            wingGeo.firstMaterial?.lightingModel = .phong
+            wingGeo.firstMaterial?.isDoubleSided = true
+            let wing = SCNNode(geometry: wingGeo)
+            wing.name = side < 0 ? "leftUpperWing" : "rightUpperWing"
+            wing.position = SCNVector3(side * 0.035, 0.01, 0.01)
+            wing.pivot = SCNMatrix4MakeTranslation(-side * 0.025, 0, 0)
+            root.addChildNode(wing)
+        }
+
+        // Lower wings
+        for side: Float in [-1, 1] {
+            let wingGeo = SCNBox(width: 0.045, height: 0.04, length: 0.005, chamferRadius: 0.01)
+            wingGeo.firstMaterial?.diffuse.contents = wingColor.withAlphaComponent(0.7)
+            wingGeo.firstMaterial?.lightingModel = .phong
+            wingGeo.firstMaterial?.isDoubleSided = true
+            let wing = SCNNode(geometry: wingGeo)
+            wing.name = side < 0 ? "leftLowerWing" : "rightLowerWing"
+            wing.position = SCNVector3(side * 0.03, -0.005, -0.01)
+            wing.pivot = SCNMatrix4MakeTranslation(-side * 0.02, 0, 0)
+            root.addChildNode(wing)
+        }
+
+        // Antennae
+        for side: Float in [-1, 1] {
+            let antGeo = SCNCylinder(radius: 0.002, height: 0.04)
+            antGeo.firstMaterial?.diffuse.contents = UIColor(white: 0.2, alpha: 1)
+            let ant = SCNNode(geometry: antGeo)
+            ant.position = SCNVector3(side * 0.01, 0.02, 0.04)
+            ant.eulerAngles = SCNVector3(Float.pi * 0.3, 0, side * Float.pi * 0.2)
+            root.addChildNode(ant)
+        }
+
+        return root
+    }
+
+    private static func animateButterfly(_ root: SCNNode) {
+        for name in ["leftUpperWing", "leftLowerWing"] {
+            if let wing = root.childNode(withName: name, recursively: false) {
+                let flutter = SCNAction.repeatForever(SCNAction.sequence([
+                    SCNAction.rotateBy(x: 0, y: CGFloat.pi * 0.4, z: 0, duration: 0.12),
+                    SCNAction.rotateBy(x: 0, y: -CGFloat.pi * 0.4, z: 0, duration: 0.15),
+                ]))
+                wing.runAction(flutter)
+            }
+        }
+        for name in ["rightUpperWing", "rightLowerWing"] {
+            if let wing = root.childNode(withName: name, recursively: false) {
+                let flutter = SCNAction.repeatForever(SCNAction.sequence([
+                    SCNAction.rotateBy(x: 0, y: -CGFloat.pi * 0.4, z: 0, duration: 0.12),
+                    SCNAction.rotateBy(x: 0, y: CGFloat.pi * 0.4, z: 0, duration: 0.15),
+                ]))
+                wing.runAction(flutter)
+            }
+        }
+
+        let wander = SCNAction.repeatForever(SCNAction.sequence([
+            SCNAction.moveBy(x: 0.03, y: 0.02, z: 0.01, duration: 0.8),
+            SCNAction.moveBy(x: -0.02, y: -0.01, z: 0.02, duration: 0.6),
+            SCNAction.moveBy(x: -0.01, y: 0.02, z: -0.03, duration: 0.7),
+        ]))
+        wander.timingMode = .easeInEaseOut
+        root.runAction(wander)
+    }
+
+    // MARK: - Quest Marker (3D orb + pin + glow)
+
+    static func buildQuestMarker(red: CGFloat, green: CGFloat, blue: CGFloat, isCompleted: Bool) -> SCNNode {
+        let root = SCNNode()
+        let questColor = UIColor(red: red, green: green, blue: blue, alpha: 1.0)
+        let alpha: CGFloat = isCompleted ? 0.5 : 1.0
+
+        // Main orb
+        let orbGeo = SCNSphere(radius: 0.2)
+        orbGeo.firstMaterial?.diffuse.contents = questColor.withAlphaComponent(alpha)
+        orbGeo.firstMaterial?.lightingModel = .phong
+        orbGeo.firstMaterial?.specular.contents = UIColor.white.withAlphaComponent(0.5)
+        orbGeo.firstMaterial?.emission.contents = questColor.withAlphaComponent(0.15)
+        let orb = SCNNode(geometry: orbGeo)
+        orb.name = "questOrb"
+        orb.position = SCNVector3(0, 0.35, 0)
+        root.addChildNode(orb)
+
+        // Outer glow ring
+        let ringGeo = SCNTorus(ringRadius: 0.22, pipeRadius: 0.015)
+        ringGeo.firstMaterial?.diffuse.contents = questColor.withAlphaComponent(0.3 * alpha)
+        ringGeo.firstMaterial?.emission.contents = questColor.withAlphaComponent(0.2 * alpha)
+        let ring = SCNNode(geometry: ringGeo)
+        ring.name = "questRing"
+        ring.position = SCNVector3(0, 0.35, 0)
+        root.addChildNode(ring)
+
+        // Pin cone pointing down
+        let coneGeo = SCNCone(topRadius: 0.08, bottomRadius: 0.005, height: 0.2)
+        coneGeo.firstMaterial?.diffuse.contents = questColor.withAlphaComponent(alpha)
+        coneGeo.firstMaterial?.lightingModel = .phong
+        let cone = SCNNode(geometry: coneGeo)
+        cone.position = SCNVector3(0, 0.05, 0)
+        root.addChildNode(cone)
+
+        // Completed checkmark indicator
+        if isCompleted {
+            let checkGeo = SCNSphere(radius: 0.08)
+            checkGeo.firstMaterial?.diffuse.contents = UIColor(red: 0.24, green: 0.85, blue: 0.48, alpha: 1)
+            checkGeo.firstMaterial?.emission.contents = UIColor(red: 0.24, green: 0.85, blue: 0.48, alpha: 0.3)
+            let check = SCNNode(geometry: checkGeo)
+            check.position = SCNVector3(0.18, 0.5, 0)
+            root.addChildNode(check)
+        }
+
+        return root
+    }
+
+    private static func animateQuestMarker(_ root: SCNNode) {
+        if let orb = root.childNode(withName: "questOrb", recursively: false) {
+            let bob = SCNAction.repeatForever(SCNAction.sequence([
+                SCNAction.moveBy(x: 0, y: 0.04, z: 0, duration: 1.2),
+                SCNAction.moveBy(x: 0, y: -0.04, z: 0, duration: 1.2),
+            ]))
+            bob.timingMode = .easeInEaseOut
+            orb.runAction(bob)
+        }
+
+        if let ring = root.childNode(withName: "questRing", recursively: false) {
+            let spin = SCNAction.repeatForever(
+                SCNAction.rotateBy(x: 0, y: CGFloat.pi * 2, z: 0, duration: 6.0)
+            )
+            ring.runAction(spin)
+
+            let bob = SCNAction.repeatForever(SCNAction.sequence([
+                SCNAction.moveBy(x: 0, y: 0.04, z: 0, duration: 1.2),
+                SCNAction.moveBy(x: 0, y: -0.04, z: 0, duration: 1.2),
+            ]))
+            bob.timingMode = .easeInEaseOut
+            ring.runAction(bob)
         }
     }
 }

@@ -67,8 +67,8 @@ final class MapViewModel {
         let airports = await airportResults
         let waterBodies = await waterResults
 
-        // Birds — scattered around the area
-        for i in 0..<6 {
+        // Birds — scattered around the area (V-formation flocks)
+        for i in 0..<4 {
             let coord = randomCoordinate(near: center, spanDelta: span * 0.6)
             elements.append(AtmosphericElement(
                 id: "bird_\(i)",
@@ -79,24 +79,13 @@ final class MapViewModel {
         }
 
         // Clouds — spread across a wider area
-        for i in 0..<5 {
+        for i in 0..<3 {
             let coord = randomCoordinate(near: center, spanDelta: span * 0.8)
             elements.append(AtmosphericElement(
                 id: "cloud_\(i)",
                 kind: .cloud,
                 coordinate: coord,
                 heading: Double.random(in: 240...300) // generally west-to-east drift
-            ))
-        }
-
-        // Leaves — clustered near parks/green areas
-        for i in 0..<4 {
-            let coord = randomCoordinate(near: center, spanDelta: span * 0.4)
-            elements.append(AtmosphericElement(
-                id: "leaf_\(i)",
-                kind: .leaf,
-                coordinate: coord,
-                heading: Double.random(in: 0..<360)
             ))
         }
 
@@ -155,26 +144,28 @@ final class MapViewModel {
             ))
         }
 
-        // Hot air balloons
-        for i in 0..<2 {
+        // Hot air balloons — rare sighting (30% chance per regeneration)
+        if Double.random(in: 0...1) < 0.3 {
             let coord = randomCoordinate(near: center, spanDelta: span * 0.5)
             elements.append(AtmosphericElement(
-                id: "balloon_\(i)",
+                id: "balloon_0",
                 kind: .hotAirBalloon,
                 coordinate: coord,
                 heading: Double.random(in: 0..<360)
             ))
         }
 
-        // Butterflies — small and near the player
-        for i in 0..<3 {
-            let coord = randomCoordinate(near: center, spanDelta: span * 0.2)
-            elements.append(AtmosphericElement(
-                id: "butterfly_\(i)",
-                kind: .butterfly,
-                coordinate: coord,
-                heading: Double.random(in: 0..<360)
-            ))
+        // Butterflies — only visible when zoomed in (small span = close to ground)
+        if span < 0.02 {
+            for i in 0..<3 {
+                let coord = randomCoordinate(near: center, spanDelta: span * 0.15)
+                elements.append(AtmosphericElement(
+                    id: "butterfly_\(i)",
+                    kind: .butterfly,
+                    coordinate: coord,
+                    heading: Double.random(in: 0..<360)
+                ))
+            }
         }
 
         atmosphericElements = elements

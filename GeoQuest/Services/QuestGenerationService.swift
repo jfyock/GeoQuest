@@ -89,8 +89,8 @@ final class QuestGenerationService {
                 let questId = try await questService.createQuest(quest)
 
                 // Capture and upload a MapKit snapshot for this quest's area.
-                // Try twice — map tiles may not be cached on first attempt.
-                for attempt in 1...2 {
+                // Try up to 3 times — map tiles may not be cached on first attempt.
+                for attempt in 1...3 {
                     if let snapshotData = await captureMapSnapshot(
                         coordinate: questCoord,
                         spanMeters: 400
@@ -101,8 +101,8 @@ final class QuestGenerationService {
                             break
                         }
                     }
-                    if attempt < 2 {
-                        try? await Task.sleep(for: .seconds(1))
+                    if attempt < 3 {
+                        try? await Task.sleep(for: .seconds(Double(attempt) * 1.5))
                     }
                 }
             }
@@ -461,15 +461,16 @@ final class QuestGenerationService {
     // MARK: - Map Snapshot
 
     /// Captures a map snapshot centred on `coordinate`.
-    /// Tries satellite imagery first, falls back to standard map style.
+    /// Tries standard map first (most reliable for tile availability),
+    /// then falls back to hybrid/satellite imagery.
     /// Returns JPEG data or nil if snapshotting fails entirely.
     @MainActor
     private func captureMapSnapshot(
         coordinate: CLLocationCoordinate2D,
         spanMeters: Double
     ) async -> Data? {
-        // Try multiple map types in order of visual quality
-        let mapTypes: [MKMapType] = [.hybrid, .satellite, .standard]
+        // Standard first — tiles are most reliably cached / available.
+        let mapTypes: [MKMapType] = [.standard, .hybrid, .satellite]
 
         for mapType in mapTypes {
             let options = MKMapSnapshotter.Options()
@@ -481,17 +482,19 @@ final class QuestGenerationService {
             options.size = CGSize(width: 800, height: 480)
             options.mapType = mapType
             options.showsBuildings = true
+            options.traitCollection = UITraitCollection(displayScale: 2.0)
 
             let snapshotter = MKMapSnapshotter(options: options)
             do {
                 let snapshot = try await snapshotter.start()
-                // Draw a pin marker on the snapshot center
                 let image = drawPin(on: snapshot)
-                if let data = image.jpegData(compressionQuality: 0.80) {
+                if let data = image.jpegData(compressionQuality: 0.82),
+                   data.count > 5_000 {
+                    // Guard against blank/empty snapshots (typically < 5 KB)
                     return data
                 }
             } catch {
-                continue // Try next map type
+                continue
             }
         }
         return nil

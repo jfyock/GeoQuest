@@ -52,22 +52,30 @@ struct MapContainerView: View {
                     }
                 }
 
-                // Quest annotations
+                // Quest annotations — 3D markers with perspective matching
                 ForEach(viewModel.visibleQuests) { quest in
                     Annotation(quest.title, coordinate: quest.coordinate) {
-                        QuestAnnotationView(data: quest)
-                            .onTapGesture {
-                                withAnimation(GQTheme.bouncyQuick) {
-                                    viewModel.selectedQuestId = quest.id
-                                }
+                        QuestAnnotationView(
+                            data: quest,
+                            cameraPitch: viewModel.cameraPitch,
+                            zoomScale: viewModel.playerAnnotationScale
+                        )
+                        .onTapGesture {
+                            withAnimation(GQTheme.bouncyQuick) {
+                                viewModel.selectedQuestId = quest.id
                             }
+                        }
                     }
                 }
 
-                // Atmospheric elements anchored to real map coordinates
+                // 3D atmospheric elements anchored to real map coordinates
                 ForEach(viewModel.atmosphericElements) { element in
                     Annotation("", coordinate: element.coordinate, anchor: .center) {
-                        AtmosphericAnnotationView(element: element)
+                        AtmosphericAnnotationView(
+                            element: element,
+                            cameraPitch: viewModel.cameraPitch,
+                            zoomScale: viewModel.playerAnnotationScale
+                        )
                     }
                 }
             }
@@ -112,29 +120,6 @@ struct MapContainerView: View {
                     .buttonStyle(BouncyButtonStyle())
 
                     Spacer()
-
-                    // Loading indicator or refresh button
-                    if viewModel.isLoadingQuests {
-                        ProgressView()
-                            .frame(width: 44, height: 44)
-                            .background(.ultraThinMaterial, in: Circle())
-                    } else {
-                        Button {
-                            Task {
-                                if let location = appState.locationService.currentLocation {
-                                    await viewModel.forceRegenerate(near: location)
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 44, height: 44)
-                                .background(.ultraThinMaterial, in: Circle())
-                                .gqShadow()
-                        }
-                        .buttonStyle(BouncyButtonStyle())
-                    }
                 }
                 .padding(.horizontal, GQTheme.paddingMedium)
 
