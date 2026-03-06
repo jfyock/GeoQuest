@@ -6,9 +6,11 @@ final class ChatViewModel {
     var isSending = false
 
     private let chatService: ChatService
+    private var dailyService: DailyObjectiveService?
 
-    init(chatService: ChatService) {
+    init(chatService: ChatService, dailyService: DailyObjectiveService? = nil) {
         self.chatService = chatService
+        self.dailyService = dailyService
     }
 
     var messages: [ChatMessage] {
@@ -37,6 +39,7 @@ final class ChatViewModel {
         do {
             try await chatService.sendMessage(text: text, sender: sender)
             messageText = ""
+            try? await dailyService?.recordEvent(type: .sendChatMessage, userId: sender.id)
         } catch {
             // Send failed
         }

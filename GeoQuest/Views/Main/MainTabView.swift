@@ -22,7 +22,11 @@ struct MainTabView: View {
                 ChatView()
             }
 
-            Tab("Profile", systemImage: "person.crop.circle.fill", value: 4) {
+            Tab("Daily", systemImage: "flame.fill", value: 4) {
+                DailyView()
+            }
+
+            Tab("Profile", systemImage: "person.crop.circle.fill", value: 5) {
                 ProfileView()
             }
         }

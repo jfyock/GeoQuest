@@ -38,7 +38,8 @@ struct QuestCreationView: View {
                 viewModel = QuestCreationViewModel(
                     questService: appState.questService,
                     userService: appState.userService,
-                    leaderboardService: appState.leaderboardService
+                    leaderboardService: appState.leaderboardService,
+                    dailyService: appState.dailyObjectiveService
                 )
             }
         }

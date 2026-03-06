@@ -75,3 +75,27 @@ final class UserService {
         )
     }
 }
+
+extension UserService {
+    func addGems(userId: String, gems: Int) async throws {
+        try await firestoreService.updateFields(
+            collection: AppConstants.Collections.users,
+            documentId: userId,
+            fields: ["gems": FieldValue.increment(Int64(gems))]
+        )
+    }
+
+    /// Updates streak state after computing the new streak server-side.
+    func updateStreak(userId: String, currentStreak: Int, longestStreak: Int, lastLoginDate: Date) async throws {
+        try await firestoreService.updateFields(
+            collection: AppConstants.Collections.users,
+            documentId: userId,
+            fields: [
+                "currentStreak": currentStreak,
+                "longestStreak": longestStreak,
+                "lastLoginDate": lastLoginDate,
+                "lastActiveAt": Date(),
+            ]
+        )
+    }
+}

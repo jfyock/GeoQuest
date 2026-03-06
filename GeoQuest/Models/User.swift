@@ -13,11 +13,18 @@ struct GQUser: Codable, Identifiable, Sendable {
     var lastActiveAt: Date
     var gems: Int
     var ownedCosmeticIds: [String]
+    /// Current consecutive daily login streak.
+    var currentStreak: Int
+    /// All-time best streak.
+    var longestStreak: Int
+    /// The calendar date of the most recent login that counted toward the streak.
+    var lastLoginDate: Date?
 
     enum CodingKeys: String, CodingKey {
         case id, email, displayName, avatarConfig, totalScore
         case questsCreated, questsCompleted, city, joinedAt, lastActiveAt
         case gems, ownedCosmeticIds
+        case currentStreak, longestStreak, lastLoginDate
     }
 
     init(from decoder: Decoder) throws {
@@ -34,6 +41,9 @@ struct GQUser: Codable, Identifiable, Sendable {
         lastActiveAt = try container.decode(Date.self, forKey: .lastActiveAt)
         gems = try container.decodeIfPresent(Int.self, forKey: .gems) ?? 0
         ownedCosmeticIds = try container.decodeIfPresent([String].self, forKey: .ownedCosmeticIds) ?? []
+        currentStreak = try container.decodeIfPresent(Int.self, forKey: .currentStreak) ?? 0
+        longestStreak = try container.decodeIfPresent(Int.self, forKey: .longestStreak) ?? 0
+        lastLoginDate = try container.decodeIfPresent(Date.self, forKey: .lastLoginDate)
     }
 
     init(
@@ -54,5 +64,8 @@ struct GQUser: Codable, Identifiable, Sendable {
         self.lastActiveAt = Date()
         self.gems = 0
         self.ownedCosmeticIds = []
+        self.currentStreak = 0
+        self.longestStreak = 0
+        self.lastLoginDate = nil
     }
 }

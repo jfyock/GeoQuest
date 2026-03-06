@@ -31,11 +31,13 @@ final class QuestCreationViewModel {
     private let userService: UserService
     private let leaderboardService: LeaderboardService
     private let storageService = StorageService()
+    private var dailyService: DailyObjectiveService?
 
-    init(questService: QuestService, userService: UserService, leaderboardService: LeaderboardService) {
+    init(questService: QuestService, userService: UserService, leaderboardService: LeaderboardService, dailyService: DailyObjectiveService? = nil) {
         self.questService = questService
         self.userService = userService
         self.leaderboardService = leaderboardService
+        self.dailyService = dailyService
     }
 
     var isValid: Bool {
@@ -119,6 +121,9 @@ final class QuestCreationViewModel {
             )
 
             let questId = try await questService.createQuest(quest)
+
+            // Record daily progress for quest creation
+            try? await dailyService?.recordEvent(type: .createQuest, userId: userId)
 
             // Upload cover image if one was selected
             if let image = questImage,

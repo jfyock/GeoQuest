@@ -55,6 +55,18 @@ enum AppConstants {
         static let creatorIdPrefix = "geoquest_generated_"
     }
 
+    // Daily objectives
+    enum Daily {
+        /// Subcollection name under each user document.
+        static let subcollection = "daily"
+        /// Gems awarded just for logging in each day.
+        static let loginGems = 10
+        /// Streak milestone intervals that award bonus gems (e.g. every 7 days).
+        static let streakMilestoneInterval = 7
+        /// Bonus gems at each milestone.
+        static let streakMilestoneGems = 50
+    }
+
     // Firestore collections
     enum Collections {
         static let users = "users"

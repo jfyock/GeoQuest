@@ -23,6 +23,7 @@ final class AppState {
     let storageService = StorageService()
     let friendService: FriendService
     let questGenerationService: QuestGenerationService
+    let dailyObjectiveService: DailyObjectiveService
     private(set) var cosmeticsService: CosmeticsService?
     private(set) var storeService: StoreService?
 
@@ -35,6 +36,7 @@ final class AppState {
         self.leaderboardService = LeaderboardService(firestoreService: firestore)
         self.friendService = FriendService(firestoreService: firestore)
         self.questGenerationService = QuestGenerationService(questService: self.questService, storageService: self.storageService)
+        self.dailyObjectiveService = DailyObjectiveService(firestoreService: firestore, userService: userSvc)
         self.cosmeticsService = CosmeticsService(firestoreService: firestore, userService: userSvc)
         self.storeService = StoreService()
     }
@@ -60,7 +62,9 @@ final class AppState {
     func loadUserProfile(uid: String) async {
         do {
             if let user: GQUser = try await userService.fetchUser(id: uid) {
-                currentUser = user
+                // Handle daily login streak before assigning to currentUser
+                let updatedUser = (try? await dailyObjectiveService.handleDailyLogin(user: user)) ?? user
+                currentUser = updatedUser
                 // Update city from current location if available
                 if currentUser?.city.isEmpty == true {
                     await locationService.reverseGeocodeCurrentLocation()

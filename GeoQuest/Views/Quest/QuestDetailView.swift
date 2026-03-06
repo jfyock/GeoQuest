@@ -30,7 +30,8 @@ struct QuestDetailView: View {
                     questService: appState.questService,
                     userService: appState.userService,
                     leaderboardService: appState.leaderboardService,
-                    cosmeticsService: appState.cosmeticsService
+                    cosmeticsService: appState.cosmeticsService,
+                    dailyService: appState.dailyObjectiveService
                 )
                 viewModel = vm
                 Task {

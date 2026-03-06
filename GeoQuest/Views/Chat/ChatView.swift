@@ -18,7 +18,7 @@ struct ChatView: View {
         }
         .onAppear {
             if viewModel == nil {
-                viewModel = ChatViewModel(chatService: appState.chatService)
+                viewModel = ChatViewModel(chatService: appState.chatService, dailyService: appState.dailyObjectiveService)
                 viewModel?.startListening()
             }
         }

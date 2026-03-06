@@ -54,17 +54,20 @@ final class QuestDetailViewModel {
     private let userService: UserService
     private let leaderboardService: LeaderboardService
     private var cosmeticsService: CosmeticsService?
+    private var dailyService: DailyObjectiveService?
 
     init(
         questService: QuestService,
         userService: UserService,
         leaderboardService: LeaderboardService,
-        cosmeticsService: CosmeticsService? = nil
+        cosmeticsService: CosmeticsService? = nil,
+        dailyService: DailyObjectiveService? = nil
     ) {
         self.questService = questService
         self.userService = userService
         self.leaderboardService = leaderboardService
         self.cosmeticsService = cosmeticsService
+        self.dailyService = dailyService
     }
 
     func loadQuest(id: String, userId: String) async {
@@ -155,6 +158,16 @@ final class QuestDetailViewModel {
             }
 
             isCompletedByUser = true
+
+            // Record daily objective progress
+            if let daily = dailyService {
+                let isHardOrExpert = quest.difficulty == .hard || quest.difficulty == .expert
+                try? await daily.recordEvent(type: .completeAnyQuest, userId: userId)
+                if isHardOrExpert {
+                    try? await daily.recordEvent(type: .completeHardOrExpertQuest, userId: userId)
+                }
+            }
+
             withAnimation(GQTheme.bouncy) {
                 playState = .completed
                 showRating = true
@@ -178,6 +191,7 @@ final class QuestDetailViewModel {
 
         do {
             try await questService.rateQuest(questId: quest.id, rating: rating)
+            try? await dailyService?.recordEvent(type: .rateQuest, userId: userId)
             showRating = false
         } catch {
             // Rating failed - non-critical
